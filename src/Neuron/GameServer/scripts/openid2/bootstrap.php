@@ -1,6 +1,8 @@
 <?php
 
-session_write_close();
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 
 if (isset($_COOKIE['dolumar-auth'])) {
     session_id($_COOKIE['dolumar-auth']);
