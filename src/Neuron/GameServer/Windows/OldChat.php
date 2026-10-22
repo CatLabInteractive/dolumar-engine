@@ -29,7 +29,7 @@ class Neuron_GameServer_Windows_OldChat extends Neuron_GameServer_Windows_Window
 	private $user;
 	private $sWhere;
 	
-	private $channel = 0;
+	public $channel = 0;
 	
 	private $aMessages = array ();
 	
