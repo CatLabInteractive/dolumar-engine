@@ -62,7 +62,11 @@ class Neuron_Auth_OpenIDConnect
 
 	public function getAuthorizationUrl (): string
 	{
-		$url = $this->provider->getAuthorizationUrl (['scope' => self::SCOPE]);
+		$url = $this->provider->getAuthorizationUrl ([
+			'scope' => self::SCOPE,
+			// league adds approval_prompt=auto by default; null keeps it out of the query.
+			'approval_prompt' => null,
+		]);
 		$_SESSION[self::SESSION_STATE_KEY] = $this->provider->getState ();
 
 		return $url;

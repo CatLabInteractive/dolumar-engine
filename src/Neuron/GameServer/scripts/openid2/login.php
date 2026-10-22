@@ -8,6 +8,8 @@ function handleOpenIDConnectAuthentication() {
     try {
         $userInfo = $flow->getProfile($_GET);
     } catch (RuntimeException | \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e) {
+        error_log('OIDC login failed: ' . get_class($e) . ': ' . $e->getMessage());
+
         $loginUrl = Neuron_URLBuilder::getInstance()->getRawURL('oauth2/login', []);
 
         http_response_code(400);

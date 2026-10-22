@@ -121,6 +121,8 @@ class OpenIDConnectTest extends TestCase
 		$this->assertSame ('openid email profile', $query['scope']);
 		$this->assertSame ('client', $query['client_id']);
 		$this->assertSame ('code', $query['response_type']);
+		$this->assertArrayNotHasKey ('approval_prompt', $query);
+		$this->assertStringNotContainsString ('approval_prompt', $url);
 	}
 
 	public function test_profile_maps_fields (): void
