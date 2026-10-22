@@ -699,6 +699,11 @@ class Neuron_GameServer_Player
         // First: load this users OpenID notification urls
         $db = Neuron_DB_Database::__getInstance ();
 
+        // Notifications are signed with the credits key: skip when unconfigured.
+        if (!defined ('CREDITS_PRIVATE_KEY')) {
+            return;
+        }
+
         $openid_rows = Neuron_GameServer_Mappers_PlayerMapper::getOpenIDs ($this);
 
         if (count ($openid_rows) > 0)
@@ -804,6 +809,11 @@ class Neuron_GameServer_Player
 
         // First: load this users OpenID notification urls
         $db = Neuron_DB_Database::__getInstance ();
+
+        // Statistics are signed with the credits key: skip when unconfigured.
+        if (!defined ('CREDITS_PRIVATE_KEY')) {
+            return;
+        }
 
         $openid_rows = Neuron_GameServer_Mappers_PlayerMapper::getOpenIDs ($this);
 

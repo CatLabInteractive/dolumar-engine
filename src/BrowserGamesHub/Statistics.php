@@ -30,7 +30,9 @@ class BrowserGamesHub_Statistics extends BBGS_Statistics
 	{
 		parent::__construct ($statistics, $information);
 		
-		$this->setPrivateKey (CREDITS_PRIVATE_KEY);
+		if (defined ('CREDITS_PRIVATE_KEY')) {
+			$this->setPrivateKey (CREDITS_PRIVATE_KEY);
+		}
 		//$this->setPrivateKey ('bla bla bla');
 	}
 }
