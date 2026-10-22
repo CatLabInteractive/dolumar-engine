@@ -273,6 +273,12 @@ class Neuron_GameServer_Player
     {
         $this->loadData ();
 
+        $storedKey = isset ($this->data['email_cert_key']) ? (string)$this->data['email_cert_key'] : '';
+        if ($storedKey === '' || !is_scalar ($key) || !hash_equals ($storedKey, (string)$key))
+        {
+            return false;
+        }
+
         Neuron_GameServer_Mappers_PlayerMapper::certifyEmail ($this, $key);
 
         $okay = $this->data['email_cert'] == 0;
@@ -289,6 +295,8 @@ class Neuron_GameServer_Player
         {
             $referer->giveReferralBonus ($this);
         }
+
+        return true;
     }
 
     public function doesEmailExist ($email)

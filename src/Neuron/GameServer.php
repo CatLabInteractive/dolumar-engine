@@ -63,6 +63,15 @@ class Neuron_GameServer
 		return $file;
 	}
 
+	/**
+	 * True when the current request belongs to a logged in admin.
+	 */
+	public static function isAdminRequest (): bool
+	{
+		$player = self::getPlayer ();
+		return $player && $player->isAdmin ();
+	}
+
 	// Initialization
 	protected final function __construct ()
 	{

@@ -27,8 +27,8 @@ global $imagecounter;
 
 $imagecounter = 1;
 
-$diameter = isset ($_GET['tiles']) ? $_GET['tiles'] : 5;
-$loadExtra = isset ($_GET['overlap']) ? $_GET['overlap'] : 3;
+$diameter = Neuron_Core_Tools::clampInt ($_GET['tiles'] ?? null, 1, 10, 5);
+$loadExtra = Neuron_Core_Tools::clampInt ($_GET['overlap'] ?? null, 0, 3, 3);
 
 // Start profiler
 $profiler = Neuron_Profiler_Profiler::__getInstance ();
@@ -125,9 +125,11 @@ if (isset ($_GET['x']) && isset ($_GET['y']))
 	*/
 }
 
+$_POST['regions'] = Neuron_Core_Tools::sanitizeMapRegions ($_POST['regions'] ?? null, 100);
+
 $db = Neuron_Core_Database::__getInstance ();
 
-if (isset ($_POST['regions']) && is_array ($_POST['regions']))
+if (count ($_POST['regions']) > 0)
 {
 	$profiler->start ('Calculating regions average point + loading buildings');
 	

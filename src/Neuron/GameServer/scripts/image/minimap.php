@@ -21,10 +21,10 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-$width = isset ($_GET['width']) ? intval ($_GET['width']) : 200;
-$tilesToLoad = isset ($_GET['tiles']) ? intval ($_GET['tiles']) : (int)ceil ($width / 4);
+$width = Neuron_Core_Tools::clampInt ($_GET['width'] ?? null, 1, 200, 200);
+$tilesToLoad = Neuron_Core_Tools::clampInt ($_GET['tiles'] ?? null, 1, 50, (int)ceil ($width / 4));
 
-$nocache = isset ($_GET['nocache']) ? true : false;
+$nocache = isset ($_GET['nocache']) && Neuron_GameServer::isAdminRequest ();
 
 /*
 	Return the background image.

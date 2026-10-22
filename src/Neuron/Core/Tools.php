@@ -60,6 +60,39 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * Int-cast a request value and clamp it to [min, max].
+	 * Missing or non-scalar values return the default.
+	 */
+	public static function clampInt ($value, $min, $max, $default)
+	{
+		if ($value === null || !is_scalar ($value))
+			return $default;
+
+		return max ($min, min ($max, intval ($value)));
+	}
+
+	/**
+	 * Normalise a list of [x, y] map regions to integer pairs,
+	 * dropping malformed entries and keeping at most $max regions.
+	 */
+	public static function sanitizeMapRegions ($regions, $max = 100)
+	{
+		$out = array ();
+		if (!is_array ($regions))
+			return $out;
+
+		foreach ($regions as $v)
+		{
+			if (count ($out) >= $max)
+				break;
+
+			if (is_array ($v) && isset ($v[0], $v[1]) && is_scalar ($v[0]) && is_scalar ($v[1]))
+				$out[] = array (intval ($v[0]), intval ($v[1]));
+		}
+		return $out;
+	}
+
+	/**
 	 * Turn request parameters into "var PARAM_<KEY> = <string>;" lines.
 	 * Keys that are not plain identifiers and non-string values are skipped.
 	 */
