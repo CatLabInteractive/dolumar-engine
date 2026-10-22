@@ -10,7 +10,8 @@ if ($parts === false || !isset($parts['host'])) {
 }
 
 $constants = [
-	'DB_SERVER' => $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''),
+	'DB_SERVER' => $parts['host'],
+	'DB_PORT' => isset($parts['port']) ? (int) $parts['port'] : 3306,
 	'DB_USERNAME' => isset($parts['user']) ? urldecode($parts['user']) : '',
 	'DB_PASSWORD' => isset($parts['pass']) ? urldecode($parts['pass']) : '',
 	'DB_DATABASE' => ltrim($parts['path'] ?? '', '/'),
