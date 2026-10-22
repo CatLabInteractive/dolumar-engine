@@ -273,17 +273,17 @@ date_default_timezone_set (TIME_ZONE);
 function customMail ($target, $subject, $msg)
 {
     try {
-        $mail = new PHPMailer ();
+        $mail = new \PHPMailer\PHPMailer\PHPMailer ();
 
         if (defined ('EMAIL_SMTP_SERVER')) {
             $mail->IsSMTP ();                                   // send via SMTP
             $mail->Host = EMAIL_SMTP_SERVER; // SMTP servers
             $mail->Port = EMAIL_SMTP_PORT;
 
-            if (defined ('EMAIL_SMTP_USERNAME')) {
+            if (defined ('EMAIL_SMTP_USERNAME') && EMAIL_SMTP_USERNAME !== '') {
                 $mail->SMTPAuth = true;     // turn on SMTP authentication
 
-                if (defined ('EMAIL_SMTP_SECURE'))
+                if (defined ('EMAIL_SMTP_SECURE') && EMAIL_SMTP_SECURE !== '')
                     $mail->SMTPSecure = EMAIL_SMTP_SECURE;
 
                 $mail->Username = EMAIL_SMTP_USERNAME;  // SMTP username
@@ -311,7 +311,7 @@ function customMail ($target, $subject, $msg)
         if (!$mail->send()) {
             throw new \Exception("Mail could not be send: " . $mail->ErrorInfo);
         }
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
 	    error_log($e->getMessage());
     }
 }
