@@ -73,7 +73,7 @@ class Neuron_GameServer_Windows_Window
 	/*
 		Do nothing really...
 	*/
-	public function __construct ()
+	public final function __construct ()
 	{
 		$this->channel = new Neuron_GameServer_Models_Channel ();
 
