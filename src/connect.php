@@ -158,20 +158,26 @@ define ('COOKIE_BASE_PATH', $base_path);
 
 define ('API_DATE_FORMAT', 'Y-m-d\TH:i:s');
 
-// Set session ID if provided
-if (isset($_GET['sessionId']) && !empty($_GET['sessionId'])) {
-    session_id ($_GET['sessionId']);
-} elseif (isset ($_GET['phpSessionId']) && !empty ($_GET['phpSessionId'])) {
-	session_id ($_GET['phpSessionId']);
-} elseif (isset ($_GET['session_id']) && !empty ($_GET['session_id'])) {
-	session_id ($_GET['session_id']);
-} elseif (isset ($_COOKIE['session_id']) && !empty ($_COOKIE['session_id'])) {
-	session_id ($_COOKIE['session_id']);
+// Set session ID if provided (only well-formed ids; strict mode in
+// getSessionOptions() makes PHP discard ids that have no existing session).
+foreach (array (
+	$_GET['sessionId'] ?? null,
+	$_GET['phpSessionId'] ?? null,
+	$_GET['session_id'] ?? null,
+	$_COOKIE['session_id'] ?? null
+) as $candidateSessionId)
+{
+	$candidateSessionId = Neuron_Core_Tools::sanitizeSessionId ($candidateSessionId);
+	if ($candidateSessionId !== null)
+	{
+		session_id ($candidateSessionId);
+		break;
+	}
 }
 
-session_start([
-    'use_cookies' => 0
-]);
+session_start (Neuron_Core_Tools::getSessionOptions (array (
+	'use_cookies' => 0
+)));
 
 // Get right language tag
 if (isset ($_GET['language']))
@@ -268,45 +274,22 @@ define ('NOW', time ());
 date_default_timezone_set (TIME_ZONE);
 
 /*
-	Stupid magic quotes
-*/
-// Strip magic quotes from request data.
-if (function_exists('get_magic_quotes_gpc') && get_magic_quotes_gpc()) {
-    // Create lamba style unescaping function (for portability)
-    $quotes_sybase = strtolower(ini_get('magic_quotes_sybase'));
-    $unescape_function = (empty($quotes_sybase) || $quotes_sybase === 'off') ? 'stripslashes($value)' : 'str_replace("\'\'","\'",$value)';
-    $stripslashes_deep = create_function('&$value, $fn', '
-        if (is_string($value)) {
-            $value = ' . $unescape_function . ';
-        } else if (is_array($value)) {
-            foreach ($value as &$v) $fn($v, $fn);
-        }
-    ');
-    
-    // Unescape data
-    $stripslashes_deep($_POST, $stripslashes_deep);
-    $stripslashes_deep($_GET, $stripslashes_deep);
-    $stripslashes_deep($_COOKIE, $stripslashes_deep);
-    $stripslashes_deep($_REQUEST, $stripslashes_deep);
-}
-
-/*
 	Replace the "mail" function by something more flexible.
 */
 function customMail ($target, $subject, $msg)
 {
     try {
-        $mail = new PHPMailer ();
+        $mail = new \PHPMailer\PHPMailer\PHPMailer ();
 
         if (defined ('EMAIL_SMTP_SERVER')) {
             $mail->IsSMTP ();                                   // send via SMTP
             $mail->Host = EMAIL_SMTP_SERVER; // SMTP servers
             $mail->Port = EMAIL_SMTP_PORT;
 
-            if (defined ('EMAIL_SMTP_USERNAME')) {
+            if (defined ('EMAIL_SMTP_USERNAME') && EMAIL_SMTP_USERNAME !== '') {
                 $mail->SMTPAuth = true;     // turn on SMTP authentication
 
-                if (defined ('EMAIL_SMTP_SECURE'))
+                if (defined ('EMAIL_SMTP_SECURE') && EMAIL_SMTP_SECURE !== '')
                     $mail->SMTPSecure = EMAIL_SMTP_SECURE;
 
                 $mail->Username = EMAIL_SMTP_USERNAME;  // SMTP username
@@ -334,7 +317,7 @@ function customMail ($target, $subject, $msg)
         if (!$mail->send()) {
             throw new \Exception("Mail could not be send: " . $mail->ErrorInfo);
         }
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
 	    error_log($e->getMessage());
     }
 }

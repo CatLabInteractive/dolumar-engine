@@ -29,6 +29,24 @@ class Neuron_GameServer
 
 	const SCRIPT_PATH = __DIR__ . '/GameServer/scripts/';
 
+	/**
+	 * Map a /test/<name> request to a script inside SCRIPT_PATH.'tests/'.
+	 * Returns the absolute path, or null when the name is not acceptable.
+	 */
+	public static function resolveTestScript (?string $name): ?string
+	{
+		if ($name === null || !preg_match ('/^[a-z0-9_]+$/D', $name))
+			return null;
+
+		$dir = realpath (self::SCRIPT_PATH . 'tests');
+		$file = realpath (self::SCRIPT_PATH . 'tests/' . $name . '.php');
+
+		if ($dir === false || $file === false || strpos ($file, $dir . DIRECTORY_SEPARATOR) !== 0)
+			return null;
+
+		return $file;
+	}
+
 	// Initialization
 	protected final function __construct ()
 	{
@@ -370,44 +388,23 @@ class Neuron_GameServer
 				// Login
 				$player = Neuron_GameServer::getPlayer ();
 
-				$overwritelogin = true;
+				$script = ($player && $player->isAdmin ())
+					? self::resolveTestScript (isset ($sInputs[1]) ? $sInputs[1] : null)
+					: null;
 
-				if ((!$player || !$player->isAdmin ()) && !$overwritelogin)
+				if ($script === null)
 				{
-					echo 'You must login.';
+					http_response_code (404);
 				}
 				else
 				{
-					$file = isset ($sInputs[1]) ? $sInputs[1] : null;
-
-					if (@include ('scripts/tests/' . $sInputs[1] . '.php'))
-					{
-						//include_once ('scripts/tests/' . $sInputs[1] . '.php');
-					}
-					else if (include (self::SCRIPT_PATH.'tests/'.$file.'.php'))
-					{
-						// ok	
-					}
-					else
-					{
-						echo "File not found: " . self::SCRIPT_PATH.'tests/'.$file.'.php';
-					}
-
-					/*if (file_exists (self::SCRIPT_PATH.'tests/'.$file.'.php'))
-					{
-					*/
-
-					/*}
-					else
-					{
-						echo "File not found: " . self::SCRIPT_PATH.'tests/'.$file.'.php';
-					}*/
+					include ($script);
 				}
 				break;
 
 			case 'admin':
 				// Check for page
-				setcookie ('session_id', session_id (), 0, COOKIE_BASE_PATH.'admin/');
+				setcookie ('session_id', session_id (), Neuron_Core_Tools::getCookieOptions (COOKIE_BASE_PATH.'admin/'));
 
 				$login = Neuron_Core_Login::getInstance (1);
 				if (!$login->isLogin ())
@@ -699,7 +696,11 @@ class Neuron_GameServer
 
 			else
 			{
-				setcookie ('session_id', $session_id, null, '/');
+				$validSessionId = Neuron_Core_Tools::sanitizeSessionId ($session_id);
+				if ($validSessionId !== null)
+				{
+					setcookie ('session_id', $validSessionId, Neuron_Core_Tools::getCookieOptions ('/'));
+				}
 
 				$parameters['session_id'] = $session_id;
 				$parameters['session_pass'] = 1;

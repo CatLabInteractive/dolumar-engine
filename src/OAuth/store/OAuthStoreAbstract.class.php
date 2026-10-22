@@ -43,7 +43,7 @@ abstract class OAuthStoreAbstract
 	abstract public function countServerTokens ( $consumer_key );
 	abstract public function getServerToken ( $consumer_key, $token, $user_id );
 	abstract public function deleteServerToken ( $consumer_key, $token, $user_id, $user_is_admin = false );
-	abstract public function listServers ( $q = '', $user_id );
+	abstract public function listServers ( $q, $user_id );
 	abstract public function updateServer ( $server, $user_id, $user_is_admin = false );
 
 	abstract public function updateConsumer ( $consumer, $user_id, $user_is_admin = false );

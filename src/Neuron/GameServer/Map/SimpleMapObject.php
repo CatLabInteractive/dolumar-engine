@@ -29,12 +29,6 @@ abstract class Neuron_GameServer_Map_SimpleMapObject
 	*/
 	public abstract function getFromId ($id);
 	
-	/**
-	*	Get the id from this object
-	*/
-	public abstract function getId ();
-	
-	
 	/*
 		Begin of the implemented class
 	*/
@@ -48,7 +42,7 @@ abstract class Neuron_GameServer_Map_SimpleMapObject
 		$this->location = $location;
 	}
 	
-	public function getLocation ()
+	public function getLocation ($time = NOW)
 	{
 		return $this->location;
 	}

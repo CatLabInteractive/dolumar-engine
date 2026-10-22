@@ -66,7 +66,7 @@ class Neuron_GameServer_Pages_Admin_User extends Neuron_GameServer_Pages_Admin_P
 				array
 				(
 					'village' => Neuron_Core_Tools::output_varchar ($v->getName ()),
-					'url' => ABSOLUTE_URL.'#'.implode ($v->buildings->getTownCenterLocation (), ',')
+					'url' => ABSOLUTE_URL.'#'.implode (',', $v->buildings->getTownCenterLocation ())
 				)
 			);
 		}

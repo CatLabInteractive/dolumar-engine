@@ -48,11 +48,13 @@ class Neuron_DB_Result implements Iterator, ArrayAccess, Countable
 	/**************************
 		ARRAY ACCESS
 	***************************/
+	#[\ReturnTypeWillChange]
 	public function offsetExists($offset)
 	{
 		return $offset >= 0 && $offset < $this->getNumRows ();
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetGet($offset)
 	{
 		// Only numeric values
@@ -72,11 +74,13 @@ class Neuron_DB_Result implements Iterator, ArrayAccess, Countable
 		return $this->cache[$offset];
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetUnset($offset)
 	{
 		// Doesn't do anything here.
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetSet($offset, $value)
 	{
 		// Doesn't do anything here.
@@ -86,16 +90,19 @@ class Neuron_DB_Result implements Iterator, ArrayAccess, Countable
 	/**************************
 		ITERATOR
 	***************************/
+	#[\ReturnTypeWillChange]
 	public function current()
 	{
 		return $this->current;
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function key()
 	{
 		return $this->rowId;
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function next()
 	{
 		$this->rowId ++;
@@ -104,11 +111,13 @@ class Neuron_DB_Result implements Iterator, ArrayAccess, Countable
 		return $this->current;
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function rewind()
 	{
 		//
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function valid()
 	{
 		return is_array ($this->current ());
@@ -117,6 +126,7 @@ class Neuron_DB_Result implements Iterator, ArrayAccess, Countable
 	/**************************
 		COUNTABLE
 	***************************/
+	#[\ReturnTypeWillChange]
 	public function count ()
 	{
 		return $this->getNumRows ();

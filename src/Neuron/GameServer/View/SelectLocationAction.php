@@ -27,7 +27,7 @@ class Neuron_GameServer_View_SelectLocationAction
 	private $value;
 	private $sprite;
 
-	public function __construct ($data, $value, Neuron_GameServer_Map_Display_Sprite $sprite = null)
+	public function __construct ($data, $value, ?Neuron_GameServer_Map_Display_Sprite $sprite = null)
 	{
 		$this->value = $value;
 		if (isset ($sprite))

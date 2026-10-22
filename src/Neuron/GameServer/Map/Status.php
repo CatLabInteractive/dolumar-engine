@@ -55,11 +55,13 @@ class Neuron_GameServer_Map_ObjectStatus implements ArrayAccess
 	/**
 		For our array acces
 	*/
+	#[\ReturnTypeWillChange]
 	public function offsetExists ( $offset )
 	{
 		return offsetGet ($offset) != null;
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetGet ( $offset )
 	{
 		switch ($offset)
@@ -83,11 +85,13 @@ class Neuron_GameServer_Map_ObjectStatus implements ArrayAccess
 		return null;
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetSet ( $offset , $value )
 	{
 		throw new Neuron_Exceptions_InvalidParameter ("You cannot change the location parameters.");
 	}
 	
+	#[\ReturnTypeWillChange]
 	public function offsetUnset ( $offset )
 	{
 		throw new Neuron_Exceptions_InvalidParameter ("You cannot change the location parameters.");

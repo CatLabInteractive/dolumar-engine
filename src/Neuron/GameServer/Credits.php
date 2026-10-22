@@ -251,6 +251,11 @@ class Neuron_GameServer_Credits
 	 */
 	private function getConvertData ($amount = 1)
 	{
+		if (!$this->objCredits) {
+			// Credits service not configured: no conversion possible.
+			return array ('amount' => $amount, 'text' => (string) $amount, 'html' => (string) $amount);
+		}
+
 		if (!isset ($this->convertcache[$amount])) {
 			$this->convertcache[$amount] = $this->objCredits->convert ($amount);
 		}

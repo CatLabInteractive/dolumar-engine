@@ -37,6 +37,10 @@ function safen(&$data) {
 
 class numbers {
 
+	public $start;
+	public $curpage;
+	public $last;
+
 	public function __construct() {
 		$this->start = 0;
 		$this->curpage = 0;

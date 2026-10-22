@@ -24,6 +24,59 @@
 class Neuron_Core_Tools
 {
 
+	/**
+	 * Is the current request served over HTTPS (directly or behind a proxy)?
+	 */
+	public static function isHttpsRequest (?array $server = null)
+	{
+		$server = $server ?? $_SERVER;
+
+		if (isset ($server['HTTP_X_FORWARDED_PROTO']) && $server['HTTP_X_FORWARDED_PROTO'] === 'https')
+			return true;
+
+		return !empty ($server['HTTPS']) && $server['HTTPS'] !== 'off';
+	}
+
+	/**
+	 * Return the id if it is a valid PHP session id, otherwise null.
+	 */
+	public static function sanitizeSessionId ($id)
+	{
+		if (is_string ($id) && preg_match ('/^[a-zA-Z0-9,-]{22,256}$/D', $id))
+			return $id;
+
+		return null;
+	}
+
+	/**
+	 * Session options shared by every session_start() call.
+	 */
+	public static function getSessionOptions (array $options = array (), ?array $server = null)
+	{
+		$options['use_strict_mode'] = 1;
+		$options['cookie_httponly'] = 1;
+		$options['cookie_samesite'] = 'Lax';
+
+		if (self::isHttpsRequest ($server))
+			$options['cookie_secure'] = 1;
+
+		return $options;
+	}
+
+	/**
+	 * Options (array form) for setcookie() when handing out a session id.
+	 */
+	public static function getCookieOptions ($path, ?array $server = null)
+	{
+		return array (
+			'expires' => 0,
+			'path' => $path,
+			'httponly' => true,
+			'samesite' => 'Lax',
+			'secure' => self::isHttpsRequest ($server)
+		);
+	}
+
 	/*
 		Resources to text
 	*/
@@ -402,8 +455,7 @@ class Neuron_Core_Tools
 	public static function getInput ($dat, $key, $type, $default = false)
 	{
 
-		global $$dat;
-		$dat = $$dat;
+		$dat = $GLOBALS[$dat] ?? null;
 
 		if (!isset ($dat[$key])) {
 
