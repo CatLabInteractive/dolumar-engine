@@ -120,7 +120,7 @@ function getBackgroundImage ($x, $y, $tilesToLoad, $usecache = true)
 				
 				);
 			
-				imagefilledpolygon($im, $punten, 4, $color);
+				imagefilledpolygon($im, $punten, $color);
 			}
 		}
 		
@@ -241,7 +241,7 @@ if (isset ($_GET['x']) && isset ($_GET['y']))
 				$px, 			$py + $halfTileY 	// Links
 			);
 			
-			imagefilledpolygon ($im, $punten, 4, $color);
+			imagefilledpolygon($im, $punten, $color);
 		}
 		
 		// Start output buffering

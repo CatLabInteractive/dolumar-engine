@@ -402,8 +402,7 @@ class Neuron_Core_Tools
 	public static function getInput ($dat, $key, $type, $default = false)
 	{
 
-		global $$dat;
-		$dat = $$dat;
+		$dat = $GLOBALS[$dat];
 
 		if (!isset ($dat[$key])) {
 

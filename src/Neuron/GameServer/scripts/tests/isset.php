@@ -2,9 +2,7 @@
 
 function getValue ($name)
 {
-	global $$name;
-
-	$var = $$name;
+	$var = $GLOBALS[$name];
 	if (isset ($var['test']))
 	{
 		echo "Key found\n\n";

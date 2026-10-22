@@ -41,7 +41,7 @@ class Neuron_GameServer_Pages_Statistics extends Neuron_GameServer_Pages_Page
 		{
 			if (is_array ($v))
 			{
-				$this->linearArray ($v, &$out, $k . '_');
+				$this->linearArray ($v, $out, $k . '_');
 			}
 			else
 			{
