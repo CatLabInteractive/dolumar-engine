@@ -158,20 +158,26 @@ define ('COOKIE_BASE_PATH', $base_path);
 
 define ('API_DATE_FORMAT', 'Y-m-d\TH:i:s');
 
-// Set session ID if provided
-if (isset($_GET['sessionId']) && !empty($_GET['sessionId'])) {
-    session_id ($_GET['sessionId']);
-} elseif (isset ($_GET['phpSessionId']) && !empty ($_GET['phpSessionId'])) {
-	session_id ($_GET['phpSessionId']);
-} elseif (isset ($_GET['session_id']) && !empty ($_GET['session_id'])) {
-	session_id ($_GET['session_id']);
-} elseif (isset ($_COOKIE['session_id']) && !empty ($_COOKIE['session_id'])) {
-	session_id ($_COOKIE['session_id']);
+// Set session ID if provided (only well-formed ids; strict mode in
+// getSessionOptions() makes PHP discard ids that have no existing session).
+foreach (array (
+	$_GET['sessionId'] ?? null,
+	$_GET['phpSessionId'] ?? null,
+	$_GET['session_id'] ?? null,
+	$_COOKIE['session_id'] ?? null
+) as $candidateSessionId)
+{
+	$candidateSessionId = Neuron_Core_Tools::sanitizeSessionId ($candidateSessionId);
+	if ($candidateSessionId !== null)
+	{
+		session_id ($candidateSessionId);
+		break;
+	}
 }
 
-session_start([
-    'use_cookies' => 0
-]);
+session_start (Neuron_Core_Tools::getSessionOptions (array (
+	'use_cookies' => 0
+)));
 
 // Get right language tag
 if (isset ($_GET['language']))

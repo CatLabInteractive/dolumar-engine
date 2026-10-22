@@ -4,15 +4,16 @@ if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();
 }
 
-if (isset($_COOKIE['dolumar-auth'])) {
-    session_id($_COOKIE['dolumar-auth']);
+$authSessionId = Neuron_Core_Tools::sanitizeSessionId($_COOKIE['dolumar-auth'] ?? null);
+if ($authSessionId !== null) {
+    session_id($authSessionId);
 }
 
 session_name('dolumar-auth');
-session_start([
+session_start(Neuron_Core_Tools::getSessionOptions([
     'use_cookies' => 1,
     'cookie_path' => '/'
-]);
+]));
 
 function getOpenIDConnectFlow() {
     $returnUrl = Neuron_URLBuilder::getInstance()->getRawURL('oauth2/login/next', []);
