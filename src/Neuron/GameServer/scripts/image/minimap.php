@@ -21,8 +21,8 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-$width = isset ($_GET['width']) ? $_GET['width'] : 200;
-$tilesToLoad = isset ($_GET['tiles']) ? $_GET['tiles'] : ceil ($width / 4);
+$width = isset ($_GET['width']) ? intval ($_GET['width']) : 200;
+$tilesToLoad = isset ($_GET['tiles']) ? intval ($_GET['tiles']) : (int)ceil ($width / 4);
 
 $nocache = isset ($_GET['nocache']) ? true : false;
 

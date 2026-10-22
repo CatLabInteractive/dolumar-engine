@@ -47,6 +47,22 @@ class Neuron_GameServer
 		return $file;
 	}
 
+	/**
+	 * Map the path segments of a /gameserver/<version>/<path> request to a file
+	 * inside the engine assets folder. Returns the absolute path, or null when
+	 * the file does not exist or lies outside the assets folder.
+	 */
+	public static function resolveAssetPath (array $segments): ?string
+	{
+		$dir = realpath (__DIR__ . '/../../assets');
+		$file = realpath ($dir . '/' . implode ('/', $segments));
+
+		if ($dir === false || $file === false || !is_file ($file) || strpos ($file, $dir . DIRECTORY_SEPARATOR) !== 0)
+			return null;
+
+		return $file;
+	}
+
 	// Initialization
 	protected final function __construct ()
 	{
@@ -316,10 +332,9 @@ class Neuron_GameServer
 				array_shift ($sInputs);
 				array_shift ($sInputs);
 
-				$assetPath = realpath (__DIR__ . '/../../assets/');
-				$filename = $assetPath . '/' . implode ('/', $sInputs);
+				$filename = self::resolveAssetPath ($sInputs);
 
-				if (file_exists($filename)) {
+				if ($filename !== null) {
 
 					$ext = explode ('.', $filename);
 					$ext = array_pop ($ext);
@@ -342,7 +357,7 @@ class Neuron_GameServer
 				}
 				else {
 					http_response_code(404);
-					echo 'File not found: ' . implode ('/', $sInputs);
+					echo 'File not found: ' . htmlspecialchars (implode ('/', $sInputs));
 				}
 
 				break;
@@ -540,7 +555,7 @@ class Neuron_GameServer
 
 			default:
 				//throw new Exception ('Invalid API call: module "'.$sModule.'" not found.');
-				echo '<p>Invalid module: '.$sModule.'</p>';
+				echo '<p>Invalid module: '.htmlspecialchars ($sModule).'</p>';
 				break;
 		}
 

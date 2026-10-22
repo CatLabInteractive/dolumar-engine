@@ -122,15 +122,27 @@ class Neuron_GameServer_Windows_Tutorial extends Neuron_GameServer_Windows_Help
 		
 		Muchos betteros, no?
 	*/
+	/**
+	 * Map a tutorial page ("<prefix>/Tutorial1") to its template name,
+	 * or null when the page name is not a plain identifier.
+	 */
+	public static function getTutorialTemplateName ($prefix, $sFile)
+	{
+		$sFile = substr ((string)$sFile, strlen ((string)$prefix) + 1);
+
+		if (!preg_match ('/^[a-zA-Z0-9_]+$/D', $sFile))
+			return null;
+
+		return 'tutorial/'.$sFile.'.phpt';
+	}
+
 	protected function getHelpFile ($sFile)
 	{
-		$sFile = substr ($sFile, strlen ($this->prefix) + 1);
-	
 		$page = new Neuron_Core_Template ();
 		
-		$filename = 'tutorial/'.$sFile.'.phpt';
+		$filename = self::getTutorialTemplateName ($this->prefix, $sFile);
 		
-		if ($page->hasTemplate ($filename))
+		if ($filename !== null && $page->hasTemplate ($filename))
 		{
 			return $page->parse ($filename);
 		}

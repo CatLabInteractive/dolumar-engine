@@ -49,6 +49,36 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * Return the tag if it is a two-letter lowercase language tag, otherwise null.
+	 */
+	public static function sanitizeLanguageTag ($tag)
+	{
+		if (is_string ($tag) && preg_match ('/^[a-z]{2}$/D', $tag))
+			return $tag;
+
+		return null;
+	}
+
+	/**
+	 * Turn request parameters into "var PARAM_<KEY> = <string>;" lines.
+	 * Keys that are not plain identifiers and non-string values are skipped.
+	 */
+	public static function getJavascriptParamDeclarations (array $params)
+	{
+		$out = '';
+		foreach ($params as $k => $v)
+		{
+			if (!is_string ($v) || !preg_match ('/^[a-zA-Z0-9_]+$/D', (string)$k))
+				continue;
+
+			$out .= 'var PARAM_' . strtoupper ($k) . ' = '
+				. json_encode ($v, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)
+				. ";\n";
+		}
+		return $out;
+	}
+
+	/**
 	 * Session options shared by every session_start() call.
 	 */
 	public static function getSessionOptions (array $options = array (), ?array $server = null)

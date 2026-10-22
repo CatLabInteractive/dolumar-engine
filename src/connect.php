@@ -179,8 +179,8 @@ session_start (Neuron_Core_Tools::getSessionOptions (array (
 	'use_cookies' => 0
 )));
 
-// Get right language tag
-if (isset ($_GET['language']))
+// Get right language tag (only plain two-letter tags; anything else is ignored)
+if (Neuron_Core_Tools::sanitizeLanguageTag ($_GET['language'] ?? null) !== null)
 {
 	define ('LANGUAGE_TAG', $_GET['language']);
 	
@@ -188,20 +188,20 @@ if (isset ($_GET['language']))
 	setcookie ('user_language', LANGUAGE_TAG, time () + COOKIE_LIFE, '/');
 }
 
-elseif (isset ($_COOKIE['user_language']))
+elseif (Neuron_Core_Tools::sanitizeLanguageTag ($_COOKIE['user_language'] ?? null) !== null)
 {
 	define ('LANGUAGE_TAG', $_COOKIE['user_language']);
 	$_SESSION['language'] = LANGUAGE_TAG;
 }
 
-elseif (isset ($_SESSION['language']))
+elseif (Neuron_Core_Tools::sanitizeLanguageTag ($_SESSION['language'] ?? null) !== null)
 {
 	define ('LANGUAGE_TAG', $_SESSION['language']);
 }
 
 else
 {
-	if (!empty ($_SESSION['loginAuthLanguage']) && strlen ($_SESSION['loginAuthLanguage']) == 2)
+	if (Neuron_Core_Tools::sanitizeLanguageTag ($_SESSION['loginAuthLanguage'] ?? null) !== null)
 	{
 		define ('LANGUAGE_TAG', $_SESSION['loginAuthLanguage']);
 		$_SESSION['language'] = LANGUAGE_TAG;

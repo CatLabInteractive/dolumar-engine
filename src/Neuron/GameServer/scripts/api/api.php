@@ -74,7 +74,7 @@ elseif ($request === 'unsubscribe')
 			else
 			{
 				echo '<p>Are you sure you want to unsubscribe from receiving Dolumar notifications?<br />';
-				echo '<a href="' . API_FULL_URL . 'unsubscribe?id=' . $id . '&key=' . $key . '&confirm=1">Yes</a> | ';
+				echo '<a href="' . htmlspecialchars (API_FULL_URL . 'unsubscribe?id=' . urlencode ($id) . '&key=' . urlencode ($key) . '&confirm=1') . '">Yes</a> | ';
 				echo '<a href="' . ABSOLUTE_URL . '">No</a> ';
 				echo '</p>';
 			}
@@ -180,11 +180,6 @@ else
 
 		break;
 
-		case 'phpinfo':
-			phpinfo ();
-			exit ();
-		break;
-		
 		case 'getlogs':
 		
 			$id = Neuron_Core_Tools::getInput ('_GET', 'id', 'int', isset ($sInputs[2]) ? $sInputs[2] : 0);
@@ -400,7 +395,7 @@ else
 		case 'print':
 		default:
 			echo '<pre>';
-			print_r ($output);
+			echo htmlspecialchars (print_r ($output, true));
 			echo '</pre>';
 		break;
 	}

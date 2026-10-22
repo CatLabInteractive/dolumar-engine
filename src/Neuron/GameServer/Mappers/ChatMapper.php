@@ -141,11 +141,11 @@ class Neuron_GameServer_Mappers_ChatMapper
 			return array ();
 		}
 
-		$additionalWhere = "AND c_m_id > '" . $since . "' ";
+		$additionalWhere = "AND c_m_id > '" . intval ($since) . "' ";
 
 		if (isset ($before))
 		{
-			$additionalWhere .= "AND c_m_id < '" . $before . "' ";			
+			$additionalWhere .= "AND c_m_id < '" . intval ($before) . "' ";
 		}
 
 		$sql = "
