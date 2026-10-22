@@ -39,49 +39,87 @@ class Neuron_Core_Memcache
 	private $sLastCache;
 	private $sLastValue;
 	
-	private function __construct ()
+	/**
+	 * Parse a server list: "host", "host:port", "memcached://host:port",
+	 * or comma-separated combinations of those.
+	 *
+	 * @return list<array{0:string,1:int}>
+	 */
+	public static function parseServers (string $servers): array
 	{
-		if (defined ('MEMCACHE_SERVERS'))
+		$out = [];
+		foreach (explode (',', $servers) as $s)
 		{
-			try
+			$s = trim ($s);
+			if ($s === '')
 			{
-				// create a new persistent client
-				$m = new Memcached("memcached_pool");
-				$m->setOption(Memcached::OPT_BINARY_PROTOCOL, TRUE);
-
-				// some nicer default options
-				$m->setOption(Memcached::OPT_NO_BLOCK, TRUE);
-				$m->setOption(Memcached::OPT_AUTO_EJECT_HOSTS, TRUE);
-				$m->setOption(Memcached::OPT_CONNECT_TIMEOUT, 2000);
-				$m->setOption(Memcached::OPT_POLL_TIMEOUT, 2000);
-				$m->setOption(Memcached::OPT_RETRY_TIMEOUT, 2);
-
-				// setup authentication
-				if (defined ('MEMCACHE_USERNAME') && defined ('MEMCACHE_PASSWORD')) {
-					$m->setSaslAuthData( MEMCACHE_USERNAME, MEMCACHE_PASSWORD );
-				}
-
-				// We use a consistent connection to memcached, so only add in the
-				// servers first time through otherwise we end up duplicating our
-				// connections to the server.
-				if (!$m->getServerList()) {
-					// parse server config
-					$servers = explode(",", MEMCACHE_SERVERS);
-					foreach ($servers as $s) {
-						$parts = explode(":", $s);
-						if (!isset($parts[1])) {
-							$parts[1] = 11211;
-						}
-						$m->addServer($parts[0], $parts[1]);
-					}
-				}
+				continue;
 			}
-			catch (Exception $e)
-			{
-				$this->objCache = false;
-			}
+
+			$s = preg_replace ('#^memcached://#i', '', $s);
+			$s = rtrim ($s, '/');
+			$parts = explode (':', $s);
+			$out[] = [$parts[0], isset ($parts[1]) && $parts[1] !== '' ? (int)$parts[1] : 11211];
 		}
-		else
+		return $out;
+	}
+
+	/**
+	 * Build an instance for an explicit server string (used by tests).
+	 */
+	public static function forServers (string $servers, ?string $username = null, ?string $password = null): self
+	{
+		return new self ($servers, $username, $password);
+	}
+
+	private function __construct (?string $servers = null, ?string $username = null, ?string $password = null)
+	{
+		$this->objCache = false;
+
+		if ($servers === null && defined ('MEMCACHE_SERVERS'))
+		{
+			$servers = MEMCACHE_SERVERS;
+			$username = defined ('MEMCACHE_USERNAME') ? MEMCACHE_USERNAME : null;
+			$password = defined ('MEMCACHE_PASSWORD') ? MEMCACHE_PASSWORD : null;
+		}
+
+		if ($servers === null || !class_exists ('Memcached'))
+		{
+			return;
+		}
+
+		try
+		{
+			// create a new persistent client (one pool per server list)
+			$m = new Memcached ('memcached_' . md5 ($servers));
+			$m->setOption (Memcached::OPT_BINARY_PROTOCOL, TRUE);
+
+			// some nicer default options
+			$m->setOption (Memcached::OPT_NO_BLOCK, TRUE);
+			$m->setOption (Memcached::OPT_AUTO_EJECT_HOSTS, TRUE);
+			$m->setOption (Memcached::OPT_CONNECT_TIMEOUT, 2000);
+			$m->setOption (Memcached::OPT_POLL_TIMEOUT, 2000);
+			$m->setOption (Memcached::OPT_RETRY_TIMEOUT, 2);
+
+			// setup authentication
+			if (is_string ($username) && $username !== '' && is_string ($password) && $password !== '')
+			{
+				$m->setSaslAuthData ($username, $password);
+			}
+
+			// We use a persistent connection, so only add the servers the
+			// first time through, otherwise connections get duplicated.
+			if (!$m->getServerList ())
+			{
+				foreach (self::parseServers ($servers) as $server)
+				{
+					$m->addServer ($server[0], $server[1]);
+				}
+			}
+
+			$this->objCache = $m;
+		}
+		catch (Exception $e)
 		{
 			$this->objCache = false;
 		}
@@ -109,7 +147,7 @@ class Neuron_Core_Memcache
 			return false;
 		}
 	
-		return @$this->objCache->set ($sKey, $sContent, 0, 0);
+		return @$this->objCache->set ($sKey, $sContent, 0);
 	}
 	
 	public function getCache ($sKey)
