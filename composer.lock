@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dafff118745a1702e13b66294bebdf23",
+    "content-hash": "f8a4f0412f9288ccb2b4896ca9896993",
     "packages": [
         {
             "name": "guzzlehttp/guzzle",
@@ -400,58 +400,6 @@
                 "source": "https://github.com/thephpleague/oauth2-client/tree/2.9.1"
             },
             "time": "2026-09-16T13:14:31+00:00"
-        },
-        {
-            "name": "openid/php-openid",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/CatLabInteractive/php-openid.git",
-                "reference": "6f049ea2033d81484a92b59b7725b0b9808ef416"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/CatLabInteractive/php-openid/zipball/6f049ea2033d81484a92b59b7725b0b9808ef416",
-                "reference": "6f049ea2033d81484a92b59b7725b0b9808ef416",
-                "shasum": ""
-            },
-            "require": {
-                "ext-bcmath": "*",
-                "ext-curl": "*",
-                "ext-dom": "*",
-                "php": ">=4.3"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "classmap": [
-                    "Auth"
-                ]
-            },
-            "include-path": [
-                "."
-            ],
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "JanRain Inc.",
-                    "homepage": "http://www.openidenabled.com"
-                }
-            ],
-            "description": "OpenID library for PHP5",
-            "homepage": "http://github.com/openid/php-openid",
-            "keywords": [
-                "auth",
-                "authentication",
-                "openid",
-                "yadis"
-            ],
-            "support": {
-                "source": "https://github.com/CatLabInteractive/php-openid/tree/master"
-            },
-            "time": "2015-08-03T10:42:27+00:00"
         },
         {
             "name": "phpmailer/phpmailer",
@@ -3057,7 +3005,6 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "openid/php-openid": 20,
         "phpcompatibility/php-compatibility": 20
     },
     "prefer-stable": false,

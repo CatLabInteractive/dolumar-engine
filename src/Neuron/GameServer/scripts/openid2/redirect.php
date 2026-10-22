@@ -3,6 +3,6 @@
 require 'bootstrap.php';
 
 $flow = getOpenIDConnectFlow();
-$url = $flow->getAuthorizationRequestUri('openid email profile');
+$url = $flow->getAuthorizationUrl();
 header('Location: ' . $url);
 

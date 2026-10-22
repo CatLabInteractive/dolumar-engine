@@ -6,7 +6,6 @@
     "php": "^8.4.27",
     "phpmailer/phpmailer": "^6.9",
     "league/oauth2-client": "^2.7",
-    "openid/php-openid" : "dev-master",
 
     "ext-memcached" : "*",
     "ext-mbstring": "*",
@@ -20,13 +19,6 @@
     "squizlabs/php_codesniffer": "^3.10",
     "phpcompatibility/php-compatibility": "^10@dev"
   },
-
-  "repositories": [
-    {
-      "type": "vcs",
-      "url":  "https://github.com/CatLabInteractive/php-openid.git"
-    }
-  ],
 
   "config": {
     "allow-plugins": {

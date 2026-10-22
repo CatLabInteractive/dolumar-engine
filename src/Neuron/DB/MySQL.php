@@ -114,6 +114,7 @@ class Neuron_DB_MySQL extends Neuron_DB_Database
 		{
 			throw new Neuron_Core_Error ('Invalid parameter: escape cannot handle arrays.');
 		}
+		$this->connect ();
 		return $this->connection->real_escape_string ($txt);
 	}
 
