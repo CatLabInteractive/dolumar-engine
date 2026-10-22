@@ -696,7 +696,11 @@ class Neuron_GameServer
 
 			else
 			{
-				setcookie ('session_id', $session_id, null, '/');
+				$validSessionId = Neuron_Core_Tools::sanitizeSessionId ($session_id);
+				if ($validSessionId !== null)
+				{
+					setcookie ('session_id', $validSessionId, Neuron_Core_Tools::getCookieOptions ('/'));
+				}
 
 				$parameters['session_id'] = $session_id;
 				$parameters['session_pass'] = 1;
