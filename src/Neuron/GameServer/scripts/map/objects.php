@@ -21,56 +21,16 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-$_POST['regions'] = array
-(
-	array 
-	(
-		'x' => 0,
-		'y' => 0,
-		'z' => 0,
-		'radius' => 100000
-	)
-);
+/*
+	map/objects: the moving objects (armies, ...) touching the posted regions,
+	as JSON. Same regions[] POST body as map/region. Logged-in players only;
+	anonymous visitors get 403 and an empty list.
+*/
 
-$out = array ();
-$out['regions'] = array ();
+$regions = Neuron_Core_Tools::sanitizeMapRegions ($_POST['regions'] ?? null, 100);
+$tiles = Neuron_Core_Tools::clampInt ($_GET['tiles'] ?? null, 1, 10, 10);
 
-if (isset ($_POST['regions']) && is_array ($_POST['regions']))
-{
-	$objectManager = $this->getMap ()->getMapObjectManager ();
+$result = $this->renderMovingObjects ($regions, $tiles, Neuron_GameServer::getPlayer (), NOW);
 
-	$objectManager->clean ();
-
-	foreach ($_POST['regions'] as $v)
-	{
-		$x = isset ($v['x']) ? $v['x'] : 0;
-		$y = isset ($v['y']) ? $v['y'] : 0;
-		$z = isset ($v['z']) ? $v['z'] : 0;
-		$radius = isset ($v['radius']) ? $v['radius'] : 1000;
-
-		$location = new Neuron_GameServer_Map_Location ($x, $y, $z);
-		$rObject = new Neuron_GameServer_Map_Radius ($radius);
-
-		$area = new Neuron_GameServer_Map_Area ($location, $rObject);
-
-		$region = array ();
-
-		$region['attributes'] = array 
-		(
-			'x' => $x,
-			'y' => $y,
-			'z' => $z,
-			'radius' => $radius
-		);
-
-		$region['objects'] = array ();
-		foreach ($objectManager->getDisplayObjects ($area) as $v)
-		{
-			$region['objects'][] = $v->getExportData ();
-		}
-
-		$out['regions'][] = $region;
-	}
-}
-
-echo Neuron_Core_Tools::output_xml ($out);
+http_response_code ($result['status']);
+echo json_encode ($result['body']);
