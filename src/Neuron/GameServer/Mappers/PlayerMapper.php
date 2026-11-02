@@ -387,7 +387,7 @@ class Neuron_GameServer_Mappers_PlayerMapper
 		$rows = $db->getDataFromQuery ($db->customQuery
 		("
 			SELECT 
-				COUNT(*) AS rank
+				COUNT(*) AS `rank`
 			FROM
 				n_players a 
 			INNER JOIN
