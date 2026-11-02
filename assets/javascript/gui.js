@@ -978,10 +978,12 @@ Game.gui =
 
 		var div;
 		var completeWindow;
+		var settings = null;
+		var oSheet = null;
 	
 		if (oWindowXML.attributes.getNamedItem('type').value == 'window')
 		{
-			var settings = {
+			settings = {
 				className:	Game.gui.sGuiTheme, 
 				title: 		title, 
 				width: 		parseInt(width),
@@ -1012,15 +1014,32 @@ Game.gui =
 			if (left != null) settings.left = left;
 			if (top != null) settings.top = top;
 		
-			win = new Window (settings);
-			
-			div = $(win.getContent ());
-			completeWindow = $(win.element);
-
-			if (className != null)
+			if (Game.layout.mode() === 'mobile')
 			{
-				completeWindow.addClassName(className);
-				win._getWindowBorderSize ();
+				oSheet = Game.sheets.open ({
+					dialogId :	sDialogId,
+					title :		title,
+					closable :	isClosable,
+					modal :		modal,
+					className :	className
+				});
+
+				win = null;
+				div = oSheet.content;
+				completeWindow = oSheet.element;
+			}
+			else
+			{
+				win = new Window (settings);
+				
+				div = $(win.getContent ());
+				completeWindow = $(win.element);
+
+				if (className != null)
+				{
+					completeWindow.addClassName(className);
+					win._getWindowBorderSize ();
+				}
 			}
 
 
@@ -1084,6 +1103,8 @@ Game.gui =
 			'sRequestData' : sRequestData,
 			'sRequestDataText' : Object.toJSON(sRequestData),
 			'oWindow' : win,
+			'oSheet' : oSheet,
+			'settings' : settings,
 			'sInputData' : '{}',
 			'iPollInterval' : iPollInterval,
 			'sPool' : sPool
@@ -1152,7 +1173,16 @@ Game.gui =
 		}
 		else
 		{
-			if (dialog.oWindow == null)
+			if (dialog.oSheet)
+			{
+				// A sheet has no Window to destroy: remove the sheet (back and
+				// close already did that before calling us as a trigger).
+				if (!isTrigger)
+				{
+					Game.sheets.close (dialog.oSheet);
+				}
+			}
+			else if (dialog.oWindow == null)
 			{
 				try
 				{
@@ -1215,11 +1245,26 @@ Game.gui =
 				)
 			)
 			{
-				Game.gui.aOpenWindows[i].oWindow.toFront();
+				Game.gui.focusWindow (Game.gui.aOpenWindows[i]);
 				return true;
 			}
 		}
 		return false;
+	},
+	
+	/*
+		Bring an open window to the front: a Window on desktop, a sheet in mobile mode.
+	*/
+	'focusWindow' : function (entry)
+	{
+		if (entry.oWindow)
+		{
+			entry.oWindow.toFront();
+		}
+		else if (entry.oSheet)
+		{
+			Game.sheets.focus (entry.oSheet);
+		}
 	},
 	
 	/*
@@ -1356,6 +1401,12 @@ Game.gui =
 		{
 			var fActionTwo = sActionTwo;
 		}
+		
+		if (Game.layout.mode() === 'mobile')
+		{
+			Game.gui.sheetMessage (sText, sLabelOne, fActionOne, sLabelTwo, fActionTwo);
+			return;
+		}
 	
 		Dialog.confirm 
 		(
@@ -1371,6 +1422,44 @@ Game.gui =
 				cancelLabel : sLabelTwo
 			}
 		);
+	},
+	
+	/*
+		Mobile mode replacement for Dialog.confirm: a modal sheet with the
+		text and two buttons. Either button closes the modal after its action.
+	*/
+	'sheetMessage' : function (sText, sLabelOne, fActionOne, sLabelTwo, fActionTwo)
+	{
+		var oSheet = Game.sheets.open ({
+			title :		'',
+			closable :	false,
+			modal :		true,
+			className :	'sheet-dialog'
+		});
+		
+		var message = new Element ('p', { 'class' : 'alert sheet-message' });
+		message.update (sText);
+		
+		var actions = new Element ('div', { 'class' : 'sheet-actions' });
+		
+		var addButton = function (sLabel, fAction)
+		{
+			var button = new Element ('button', { 'type' : 'button' });
+			button.update (sLabel);
+			button.observe ('click', function (event)
+			{
+				Event.stop (event);
+				Game.sheets.close (oSheet);
+				fAction ();
+			});
+			actions.appendChild (button);
+		};
+		
+		addButton (sLabelOne, fActionOne);
+		addButton (sLabelTwo, fActionTwo);
+		
+		oSheet.content.appendChild (message);
+		oSheet.content.appendChild (actions);
 	},
 	
 	'confirmAction' : function (sText)
@@ -1496,6 +1585,8 @@ Game.gui =
 				win.oWindow.element.style.display = 'none';
 			}
 		}
+		
+		Game.sheets.hideAll ();
 	},
 	
 	'showAllWindows' : function ()
@@ -1508,6 +1599,8 @@ Game.gui =
 				win.oWindow.element.style.display = 'block';
 			}
 		}	
+		
+		Game.sheets.showAll ();
 	},
 	
 	/*
