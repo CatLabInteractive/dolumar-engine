@@ -61,7 +61,55 @@ abstract class Neuron_GameServer_Map_MapObject
 			}
 		}
 
+		// No active movement: rest at the end of the last finished one
+		$lastEnd = null;
+		$lastLocation = null;
+		foreach ($this->movements as $v)
+		{
+			if ($v->getEndTime () <= $time && ($lastEnd === null || $v->getEndTime () > $lastEnd))
+			{
+				$lastEnd = $v->getEndTime ();
+				$lastLocation = $v->getEndLocation ();
+			}
+		}
+
+		if ($lastLocation !== null)
+		{
+			return $lastLocation;
+		}
+
 		return $this->location;
+	}
+
+	/**
+	* Whether $viewer may see the details of this object (name, path, click).
+	* Games override this; by default everything is visible.
+	*/
+	public function isRelatedTo ($viewer)
+	{
+		return true;
+	}
+
+	/**
+	* The display object an unrelated viewer gets: it must not reveal
+	* what isRelatedTo() hides (e.g. the kind). Defaults to the real one.
+	*/
+	public function getNeutralDisplayObject ()
+	{
+		return $this->getDisplayObject ();
+	}
+
+	/**
+	* A short string telling the client what kind of object this is.
+	*/
+	public function getKind ()
+	{
+		return 'object';
+	}
+
+	public function getMovements ()
+	{
+		return $this->movements;
 	}
 
 	/**

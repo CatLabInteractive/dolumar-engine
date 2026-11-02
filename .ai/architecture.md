@@ -6,7 +6,7 @@
 |------|----------|
 | `src/connect.php`, `src/config.php` | Loaded on every request by the game bootstrap. Define engine constants (`NOW`, `CATLAB_BASEPATH`, `GAMESERVER_ASSET_URL`, mail defaults, ...), session name, admin e-mail list. |
 | `src/Neuron/GameServer.php` | The server object. `Neuron_GameServer::bootstrap()` creates it, the game calls `setGame()` and `dispatch()`. `dispatch()` routes on the first path segment (`dialog`, `map`, `image`, `page`, `admin`, `api`, `oauth2`, `gameserver`, `time`, `test`, home). |
-| `src/Neuron/GameServer/` | Game-server building blocks: `Player` and `Server`, `Windows/` (base `Window` class and generic windows such as chat, messages, account), `Pages/` (full pages and `Pages/Admin/`), `Map/` (map renderer and map objects), `Mappers/` (players, chat, updates), `Models/`, `Interfaces/` (the contracts a game implements, chiefly `Neuron_GameServer_Interfaces_Game`), `Logable/`, `View/`. |
+| `src/Neuron/GameServer/` | Game-server building blocks: `Player` and `Server`, `Windows/` (base `Window` class and generic windows such as chat, messages, account), `Pages/` (full pages and `Pages/Admin/`), `Map/` (map renderer, map objects, and moving objects: `Movement` paths with timestamps, `MovingObjectsExporter` which redacts them per viewer, `Regions` which maps client regions to areas), `Mappers/` (players, chat, updates), `Models/`, `Interfaces/` (the contracts a game implements, chiefly `Neuron_GameServer_Interfaces_Game`), `Logable/`, `View/`. |
 | `src/Neuron/Core/` | Utilities: `Template`, `Text` (translations), `Tools`, `Login`, `Memcache`, `Cache`, `Lock`, `Registry`, `PGen`, legacy `Database` facade. |
 | `src/Neuron/DB/` | Database layer: abstract `Neuron_DB_Database`, `Neuron_DB_MySQL` (mysqli), `Neuron_DB_Result` (array-accessible result). |
 | `src/Neuron/Auth/` | Login: `OpenIDConnect` (current login, on `league/oauth2-client`), legacy `OpenID`, `OAuth`, `APIAccess`. |
@@ -19,6 +19,17 @@
 | `assets/` | Client-side JavaScript, CSS and images, served by the `gameserver/assets/*` route. |
 | `dumps/gameserver.sql` | Schema for the engine's own tables (the game's `dump/dump.sql` includes them). |
 | `tests/` | PHPUnit tests; `tests/bootstrap.php` defines DB constants from `DATABASE_URL`. |
+
+## Map endpoints
+
+`dispatch()` sends `map/*` to `src/Neuron/GameServer/scripts/map/map.php`: `region` (background tiles and static
+objects per client region, cached), `images` (preload list), `update` (changed regions), `plainmap`, and `objects`.
+`map/objects` takes the same `regions[]` POST as `region` and answers JSON with the *moving* objects
+(`Neuron_GameServer::renderMovingObjects()`): it asks the game's `MapObjectManager::getMovingObjects($areas, $player)`
+and exports each object through `Neuron_GameServer_Map_MovingObjectsExporter`. A viewer the object is not related to
+(`MapObject::isRelatedTo()`) gets an opaque id, a neutral kind and only the next poll window of the path. Anonymous
+visitors get 403. The client side is `assets/javascript/armies.js` (`Game.armies`), a layer inside the scrolling map
+div that polls `map/objects` and interpolates sprite positions from the path timestamps.
 
 ## How a game plugs in
 

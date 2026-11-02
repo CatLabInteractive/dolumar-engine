@@ -134,6 +134,12 @@ class Neuron_GameServer_Map_Movement
 
 	private function calcPositionFromVelocity ($progress)
 	{
+		// A movement that does not go anywhere has no velocity to speak of.
+		if ($this->getDistance () == 0)
+		{
+			return $progress;
+		}
+
 		$progress *= $this->getDuration ();
 		$speed = $this->calculateSpeed ();
 		return (( $speed['start'] * $progress) + (0.5 * $speed['acceleration'] * $progress * $progress)) / $this->getDistance ();
@@ -188,6 +194,11 @@ class Neuron_GameServer_Map_Movement
 	public function getCurrentLocation ($time = NOW)
 	{
 		$diff = $this->endTime - $this->startTime;
+		if ($diff <= 0)
+		{
+			return $this->getEndLocation ();
+		}
+
 		$percentage = ($time - $this->startTime) / $diff;
 
 		//customMail ('daedelson@gmail.com', 'coortest', $percentage);
@@ -306,6 +317,43 @@ class Neuron_GameServer_Map_Movement
 		);
 	}
 
+	/**
+	* Return a new straight movement covering only [$from, $to],
+	* clamped to this movement's own time range.
+	*/
+	public function truncate ($from, $to)
+	{
+		$from = max ($this->startTime, $from);
+		$to = min ($this->endTime, $to);
+
+		return new self
+		(
+			$from,
+			$to,
+			$this->getCurrentLocation ($from),
+			$this->getCurrentLocation ($to)
+		);
+	}
+
+	/**
+	* Plain array for JSON export: start, end and the path points.
+	*/
+	public function getPathData ()
+	{
+		$points = array ();
+		foreach ($this->locations as $v)
+		{
+			$points[] = array ((float) $v->x (), (float) $v->y ());
+		}
+
+		return array
+		(
+			'start' => $this->startTime,
+			'end' => $this->endTime,
+			'points' => $points
+		);
+	}
+
 	public function getPath ()
 	{
 		$out = array ();
@@ -380,10 +428,10 @@ class Neuron_GameServer_Map_Movement
 
 		if (isset ($this->startRotation) && isset ($this->endRotation))
 		{
-			$out['diration'] = array 
+			$out['direction'] = array 
 			(
 				'start' => array ('attributes' => $this->startRotation->getData ()),
-				'end' => array ('attributes' => $this->startRotation->getData ())
+				'end' => array ('attributes' => $this->endRotation->getData ())
 			);
 		}
 

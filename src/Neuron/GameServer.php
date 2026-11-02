@@ -934,6 +934,38 @@ class Neuron_GameServer
 	/*
 		Map logs
 	*/
+	/**
+	 * Answer a map/objects request: the moving objects (armies, ...) that
+	 * touch the given client regions, exported for $player.
+	 *
+	 * @param array $regions sanitized list of array (x, y)
+	 * @param int $tiles tiles per region, as the client posted it
+	 * @param mixed $player the logged-in player, or false/null when anonymous
+	 * @param int $now server time
+	 * @return array ('status' => 200|403, 'body' => array)
+	 */
+	public function renderMovingObjects (array $regions, $tiles, $player, $now)
+	{
+		if (!$player)
+		{
+			return array ('status' => 403, 'body' => array ('objects' => array ()));
+		}
+
+		$areas = Neuron_GameServer_Map_Regions::toAreas ($regions, $tiles);
+
+		$objects = array ();
+		$map = $this->getMap ();
+		if ($map)
+		{
+			$objects = $map->getMapObjectManager ()->getMovingObjects ($areas, $player);
+		}
+
+		$secret = sha1 ((defined ('DB_PASSWORD') ? DB_PASSWORD : '') . 'army');
+		$exporter = new Neuron_GameServer_Map_MovingObjectsExporter ($secret, 30);
+
+		return array ('status' => 200, 'body' => $exporter->export ($objects, $player, $now));
+	}
+
 	public static function addMapUpdate ($x, $y, $action)
 	{
 		switch ($action)
