@@ -1514,31 +1514,46 @@ Game.gui =
 		Poll actions
 	*/
 	
-	// Check all windows to see what the lowest poll interval is
+	// Check all windows to see what the lowest poll interval is, per pool.
+	// This runs after every dialog response of every pool. It must not restart a pool's countdown that is already
+	// running: the chat pool answers every second, and restarting the other countdowns on each answer meant the
+	// "general" pool (newsbar, map updater) never polled, so the map never showed new buildings.
 	'updatePollInterval' : function ()
 	{
 		for (var pool = 0; pool < Game.gui.aPools.length; pool ++)
 		{
-			Game.gui.iPollInterval[Game.gui.aPools[pool]] = 0;
+			var sPool = Game.gui.aPools[pool];
+			var iInterval = 0;
+
 			for (var i = 0; i < Game.gui.aOpenWindows.length; i ++)
 			{
-				if 
+				var iWindowInterval = parseInt (Game.gui.aOpenWindows[i].iPollInterval);
+
+				if
 				(
-					Game.gui.aOpenWindows[i].sPool == Game.gui.aPools[pool] &&
-					Game.gui.aOpenWindows[i].iPollInterval > 0 &&
-					(Game.gui.iPollInterval == 0 || Game.gui.aOpenWindows[i].iPollInterval < Game.gui.iPollInterval)
+					Game.gui.aOpenWindows[i].sPool == sPool &&
+					iWindowInterval > 0 &&
+					(iInterval == 0 || iWindowInterval < iInterval)
 				)
 				{
-					Game.gui.iPollInterval[Game.gui.aPools[pool]] = Game.gui.aOpenWindows[i].iPollInterval;
+					iInterval = iWindowInterval;
 				}
 			}
-		
-			if (Game.gui.iPollInterval[Game.gui.aPools[pool]] > 0)
+
+			Game.gui.iPollInterval[sPool] = iInterval;
+
+			if (iInterval > 0)
 			{
-				Game.gui.iPollCountDown[Game.gui.aPools[pool]] = Game.gui.iPollInterval[Game.gui.aPools[pool]];
+				var iCountDown = Game.gui.iPollCountDown[sPool];
+
+				// Start a countdown for a new pool, or shorten one when a faster window opened.
+				if (typeof (iCountDown) != 'number' || iCountDown > iInterval)
+				{
+					Game.gui.iPollCountDown[sPool] = iInterval;
+				}
 			}
 		}
-	},	
+	},
 	
 	'startPollActions' : function ()
 	{
