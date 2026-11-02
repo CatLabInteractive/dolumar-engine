@@ -15,6 +15,8 @@
 	<head>
 	
 		<title>Dolumar <?=$name?></title>
+
+		<meta name="viewport" id="viewport" content="width=device-width, initial-scale=1" />
 		
 		<!-- JAVASCRIPT -->		
 		<script type="text/javascript">
@@ -47,6 +49,7 @@
 			var CONFIG_ENV_SERVERNAME = '<?=str_replace (' ', '_', Neuron_GameServer_Server::getInstance()->getServerName ()); ?>';
 			var CONFIG_ENV_CONTAINER = '<?=isset($_SESSION['opensocial_container'])?$_SESSION['opensocial_container'] : 'none'; ?>';
 			var CONFIG_THEME = 'nuncio';
+			var CONFIG_LAYOUT = '<?=htmlspecialchars ($layout)?>';
 			var CONFIG_MAP_TILESIZE = <?=$map_tile_size?>;
 			
 			<?php if (defined ('GOOGLE_ANALYTICS')) { ?>
@@ -104,6 +107,7 @@
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/scrollmap.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/minimap.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/gamemap.js?version=<?=$application_version?>"></script>
+		<script type="text/javascript" src="<?=$static_client_url?>javascript/layout.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/gui.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/game.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/functions.js?version=<?=$application_version?>"></script>
