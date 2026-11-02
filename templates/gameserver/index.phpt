@@ -34,12 +34,6 @@
 			echo Neuron_Core_Tools::getJavascriptParamDeclarations ($_GET);
 			?>
 
-			<?php if (isset ($_SESSION['hide_advertisement']) && $_SESSION['hide_advertisement']) { ?>
-				var CONFIG_HIDE_ADVERTISEMENT = false;
-			<?php } else { ?>
-				var CONFIG_HIDE_ADVERTISEMENT = false;
-			<?php } ?>
-
 			var CONFIG_IS_TESTSERVER = <?= IS_TESTSERVER ? 'true' : 'false'?>;
 			var CONFIG_DATETIME_FORMAT = '<?=DATETIME?>';
 			var RUNTIME_SESSION_ID = '<?=session_id()?>';
@@ -114,7 +108,6 @@
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/functions.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/forum.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/konami.js?version=<?=$application_version?>"></script>
-		<script type="text/javascript" src="<?=$static_client_url?>javascript/advertisement.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/fancybox.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/modernizr/modernizr-1.5.min.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/extra/extra.js?version=<?=$application_version?>"></script> 
