@@ -37,4 +37,5 @@ class ExportableObject extends Neuron_GameServer_Map_MapObject
 	public function getKind() { return $this->kind; }
 	public function getName() { return $this->name; }
 	public function getDisplayObject() { return new Neuron_GameServer_Map_Display_Sprite('army.png'); }
+	public function getNeutralDisplayObject() { return new Neuron_GameServer_Map_Display_Sprite('neutral.png'); }
 }

@@ -80,4 +80,24 @@ class MovingObjectsExporterTest extends TestCase
 		$this->assertCount(1, $out['objects']);
 		$this->assertSame('b:2', $out['objects'][0]['id']);
 	}
+
+	public function testExporterSkipsObjectsThatRaiseAnError(): void
+	{
+		$bad = new class extends Neuron_GameServer_Map_MapObject {
+			public function getDisplayObject () { return intdiv (1, 0); }
+			public function getName () { return 'bad'; }
+		};
+		$bad->setLocation(new Neuron_GameServer_Map_Location(0, 0));
+		$out = (new Neuron_GameServer_Map_MovingObjectsExporter('s'))->export(
+			[$bad, $this->obj('b:3', true, 'squad', 'S')], null, 1050);
+		$this->assertCount(1, $out['objects']);
+		$this->assertSame('b:3', $out['objects'][0]['id']);
+	}
+
+	public function testUnrelatedViewerGetsTheNeutralSprite(): void
+	{
+		$out = (new Neuron_GameServer_Map_MovingObjectsExporter('s'))->export(
+			[$this->obj('b:4', false, 'attack', 'A → B')], null, 1050);
+		$this->assertSame('neutral.png', $out['objects'][0]['sprite']['url']);
+	}
 }

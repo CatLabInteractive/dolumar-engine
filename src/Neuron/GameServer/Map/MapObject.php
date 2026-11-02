@@ -91,6 +91,15 @@ abstract class Neuron_GameServer_Map_MapObject
 	}
 
 	/**
+	* The display object an unrelated viewer gets: it must not reveal
+	* what isRelatedTo() hides (e.g. the kind). Defaults to the real one.
+	*/
+	public function getNeutralDisplayObject ()
+	{
+		return $this->getDisplayObject ();
+	}
+
+	/**
 	* A short string telling the client what kind of object this is.
 	*/
 	public function getKind ()

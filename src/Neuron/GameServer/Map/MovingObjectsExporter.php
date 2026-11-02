@@ -61,7 +61,7 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 			{
 				$out[] = $this->exportObject ($object, $viewer, $now);
 			}
-			catch (Exception $e)
+			catch (Throwable $e)
 			{
 				error_log ('MovingObjectsExporter: skipping object: ' . $e->getMessage ());
 			}
@@ -86,16 +86,17 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 	private function exportObject (Neuron_GameServer_Map_MapObject $object, $viewer, $now)
 	{
 		$location = $object->getLocation ($now);
-		$sprite = $object->getDisplayObject ()->getDisplayData ();
+		$related = $object->isRelatedTo ($viewer);
+		$display = $related ? $object->getDisplayObject () : $object->getNeutralDisplayObject ();
 
 		$data = array
 		(
 			'x' => (float) $location->x (),
 			'y' => (float) $location->y (),
-			'sprite' => $sprite
+			'sprite' => $display->getDisplayData ()
 		);
 
-		if ($object->isRelatedTo ($viewer))
+		if ($related)
 		{
 			$data['id'] = $object->getUOID ();
 			$data['kind'] = $object->getKind ();
