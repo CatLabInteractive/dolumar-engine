@@ -23,10 +23,10 @@ class Neuron_ErrorHandler_Handler
     }
 
     /**
-     * @param Exception $e
+     * @param Throwable $e
      * @throws Exception
      */
-    public function notify(Exception $e)
+    public function notify(Throwable $e)
     {
         error_log ($e->getMessage());
         if (class_exists(\Airbrake\Instance::class) && defined ('AIRBRAKE_TOKEN')) {
