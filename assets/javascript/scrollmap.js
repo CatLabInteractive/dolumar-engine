@@ -764,6 +764,9 @@ function TIV_touchBegin(e, self) {
     mpos = TIV_getTouchPos(e);
     o.mx = o.drmx = mpos.x;
     o.my = o.drmy = mpos.y;
+    // Where the finger went down; drmx/drmy move along with the drag.
+    o.tapStartX = mpos.x;
+    o.tapStartY = mpos.y;
 
     o.dragging = true;
     self.el.addEventListener('touchmove', TIV_touchMove, false);
@@ -775,6 +778,7 @@ function TIV_touchBegin(e, self) {
 
 function TIV_touchEnd(e) {
     var o = this._TIV_obj;
+    var tap = !o.pinching && o.dragging && TIV_isTap(o, e);
 
     if (o.pinching && (!e || !e.touches || e.touches.length < 2)) {
         o.pinching = false;
@@ -791,7 +795,53 @@ function TIV_touchEnd(e) {
     // Recalculate
     o.drawVisibleImages();
 
+    if (tap) {
+        TIV_tapClick(o, e);
+    }
+
     return false;
+}
+
+/*
+    The touchstart handler cancels the default action so the page never scrolls or zooms
+    behind the map, but that also stops the browser from turning a tap into a click. The
+    map's clickable objects (image-map areas and movable objects) only listen for clicks,
+    so a clean tap (one finger, hardly moved, short) gets one dispatched by hand.
+*/
+var TIV_TAP_MAX_MOVE = 10;
+var TIV_TAP_MAX_DURATION = 500;
+
+function TIV_isTap(o, e) {
+    if (!e || !e.changedTouches || e.changedTouches.length !== 1 || !o.touchStart) {
+        return false;
+    }
+    if (o.selecting || o.selectingTouch) {
+        return false;
+    }
+    if ((new Date()).getTime() - o.touchStart.getTime() > TIV_TAP_MAX_DURATION) {
+        return false;
+    }
+    var touch = e.changedTouches[0];
+    var dx = touch.clientX - o.tapStartX;
+    var dy = touch.clientY - o.tapStartY;
+    return (dx * dx + dy * dy) <= TIV_TAP_MAX_MOVE * TIV_TAP_MAX_MOVE;
+}
+
+function TIV_tapClick(o, e) {
+    var touch = e.changedTouches[0];
+    var target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    if (!target || target === o.overlay) {
+        return;
+    }
+
+    var click = document.createEvent('MouseEvents');
+    click.initMouseEvent(
+        'click', true, true, window, 1,
+        touch.screenX, touch.screenY, touch.clientX, touch.clientY,
+        false, false, false, false, 0, null
+    );
+    target.dispatchEvent(click);
 }
 
 function TIV_touchDistance(e) {
