@@ -134,6 +134,12 @@ class Neuron_GameServer_Map_Movement
 
 	private function calcPositionFromVelocity ($progress)
 	{
+		// A movement that does not go anywhere has no velocity to speak of.
+		if ($this->getDistance () == 0)
+		{
+			return $progress;
+		}
+
 		$progress *= $this->getDuration ();
 		$speed = $this->calculateSpeed ();
 		return (( $speed['start'] * $progress) + (0.5 * $speed['acceleration'] * $progress * $progress)) / $this->getDistance ();
@@ -188,6 +194,11 @@ class Neuron_GameServer_Map_Movement
 	public function getCurrentLocation ($time = NOW)
 	{
 		$diff = $this->endTime - $this->startTime;
+		if ($diff <= 0)
+		{
+			return $this->getEndLocation ();
+		}
+
 		$percentage = ($time - $this->startTime) / $diff;
 
 		//customMail ('daedelson@gmail.com', 'coortest', $percentage);

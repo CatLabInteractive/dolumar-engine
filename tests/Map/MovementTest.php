@@ -48,6 +48,21 @@ class MovementTest extends TestCase
 		$this->assertSame(1100, $t->getEndTime());
 	}
 
+	public function testZeroLengthMovementStaysPut(): void
+	{
+		$m = new Neuron_GameServer_Map_Movement(1000, 1100,
+			new Neuron_GameServer_Map_Location(4, 4), new Neuron_GameServer_Map_Location(4, 4));
+		$this->assertEqualsWithDelta(4.0, $m->getCurrentLocation(1050)->x(), 0.001);
+		$this->assertEqualsWithDelta(4.0, $m->getCurrentLocation(1050)->y(), 0.001);
+	}
+
+	public function testZeroDurationMovementIsAtEnd(): void
+	{
+		$m = new Neuron_GameServer_Map_Movement(1000, 1000,
+			new Neuron_GameServer_Map_Location(0, 0), new Neuron_GameServer_Map_Location(3, 0));
+		$this->assertEqualsWithDelta(3.0, $m->getCurrentLocation(1000)->x(), 0.001);
+	}
+
 	public function testPathDataIsPlainArray(): void
 	{
 		$this->assertSame(
