@@ -67,6 +67,11 @@ class Neuron_GameServer_Credits_AccountsClient
 		return new self ($url, (string)OPENID_CONNECT_CLIENT_ID, (string)OPENID_CONNECT_SECRET);
 	}
 
+	public function getBaseUrl (): string
+	{
+		return $this->baseUrl;
+	}
+
 	public function getBuyUrl (): string
 	{
 		return $this->baseUrl . 'credits/' . CATLAB_CREDITS_TYPE_ID . '/purchase';

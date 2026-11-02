@@ -21,37 +21,42 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-/*
-	This class manages the connection to the premium
-	credits server.
-*/
+/**
+ * Credits of one player, backed by CatLab Accounts.
+ * Every method returns null / does nothing while credits are not configured.
+ */
 class Neuron_GameServer_Credits
 {
 	private $objUser;
-	private $sToken;
 
 	private $error;
 
-	private $objCredits;
+	/** @var Neuron_GameServer_Credits_AccountsClient|false|null test override; false = off */
+	private static $clientOverride = null;
 
-	private $convertcache = array ();
 
 	/**
-	 * @return BBGS_Credits|null
+	 * @param Neuron_GameServer_Credits_AccountsClient|false|null $client false forces "off", null restores config
+	 */
+	public static function setClientOverride ($client)
+	{
+		self::$clientOverride = $client;
+	}
+
+	/**
+	 * @return Neuron_GameServer_Credits_AccountsClient|null
 	 */
 	public static function getPureCreditsObject ()
 	{
-		if (
-			!defined('CREDITS_GAME_TOKEN') ||
-			!defined('CREDITS_PRIVATE_KEY')
-		) {
+		if (self::$clientOverride === false)
+		{
 			return null;
 		}
-
-		$out = new BBGS_Credits(CREDITS_GAME_TOKEN);
-		$out->setPrivateKey (CREDITS_PRIVATE_KEY);
-
-		return $out;
+		if (self::$clientOverride !== null)
+		{
+			return self::$clientOverride;
+		}
+		return Neuron_GameServer_Credits_AccountsClient::fromConfig ();
 	}
 
 	/**
@@ -60,58 +65,16 @@ class Neuron_GameServer_Credits
 	public function __construct (Neuron_GameServer_Player $objUser)
 	{
 		$this->objUser = $objUser;
-
 		$this->objCredits = self::getPureCreditsObject ();
-		if (!$this->objCredits) {
-			return;
-		}
-
-		if ($this->objUser->isEmailCertified ()) {
-			$this->objCredits->setEmail ($this->getEmail ());
-		}
-
-		$this->objCredits->setReferal ($objUser->getReferal ());
-
-		foreach ($objUser->getOpenIDs () as $v) {
-			$this->objCredits->addOpenID ($v);
-		}
-
-		$container = isset ($_SESSION['opensocial_container']) ?
-			$_SESSION['opensocial_container'] : null;
-
-		if (isset ($container)) {
-			$this->objCredits->setContainer ($container);
-		}
-
-		$fullscreen = isset ($_SESSION['fullscreen']) && $_SESSION['fullscreen'] ? 1 : 0;
-		$this->objCredits->setFullscreen ($fullscreen);
-
-		$this->objCredits->setLanguage (Neuron_Core_Text::getInstance ()->getCurrentLanguage ());
-
-		$this->objCredits->setUserId ($objUser->getId ());
-
-		if (isset ($_SESSION['birthday']))
-		{
-			$this->objCredits->setBirthday ($_SESSION['birthday']);
-		}
-
-		if (isset ($_SESSION['gender']))
-		{
-			$this->objCredits->setGender (strtolower ($_SESSION['gender']) == 'm' ? 'male' : 'female');
-		}
 	}
 
-	/**
-	 * @return string
-	 */
-	private function getEmail ()
-	{
-		return trim (strtolower ($this->objUser->getEmail ()));
-	}
+	private $objCredits;
 
 	/**
-	 * @return array|bool|int|mixed|null
-	 * @throws Exception
+	 * Credit balance, or null when credits are off, the player has no
+	 * Accounts token yet, or Accounts is unreachable.
+	 *
+	 * @return int|null
 	 */
 	public function getCredits ()
 	{
@@ -119,18 +82,24 @@ class Neuron_GameServer_Credits
 			return null;
 		}
 
-		if (!$this->objCredits->isValidData (false)) {
-			return 0;
+		$auth = Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance ()->getForPlayer ($this->objUser);
+		if ($auth === null || $auth['access_token'] === '') {
+			return null;
 		}
 
 		try
 		{
-			return $this->objCredits->getCredits ();
+			return $this->objCredits->getBalance ($auth['access_token']);
 		}
-		catch (BadMethodCallException $e)
+		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
 		{
-			$this->error = 'email_not_set';
-			return false;
+			$this->error = 'credits_unavailable';
+			return null;
+		}
+		catch (Neuron_GameServer_Credits_AccountsRejected $e)
+		{
+			$this->error = 'credits_unavailable';
+			return null;
 		}
 	}
 
@@ -151,73 +120,51 @@ class Neuron_GameServer_Credits
 			return null;
 		}
 
-		//return PREMIUM_URL . '?email='.$this->getEmail().'&token='.$this->sToken;
-		return $this->objCredits->buyCredits ();
+		return $this->objCredits->getBuyUrl ();
 	}
 
 	/**
-	 * @param $amount
-	 * @param $description
-	 * @param $action
-	 * @return bool|null
-	 */
-	public function refundCredits ($amount, $description, $action)
-	{
-		if (!$this->objCredits) {
-			return null;
-		}
-
-		return $this->objCredits->refundCredits ($amount, $description, $action);
-	}
-
-	/**
-	 * This function connects to the credit gateway
-	 * and checks if a certain transaction exists.
+	 * Manual (admin) refund of $amount credits to the player's profile.
 	 *
-	 * If the transaction exists, it handles it
-	 * and returns TRUE.
-	 *
-	 * @param $data
-	 * @param $transactionId
-	 * @param $transactionKey
-	 * @return bool|null
-	 */
-	public function handleUseRequest ($data, $transactionId, $transactionKey)
-	{
-		if (!$this->objCredits) {
-			return null;
-		}
-
-		if (isset ($_POST['transaction_id']) && isset ($_POST['transaction_secret']))
-		{
-			$valid = $this->objCredits->isRequestValid ($_POST['transaction_id'], $_POST['transaction_secret']);
-
-			if ($valid)
-			{
-				$amount = $_POST['transaction_amount'];
-				$this->objUser->useCredit ($amount, $data);
-
-				return true;
-			}
-			else
-			{
-				$this->error = 'This request was not valid or already executed. Ignore.';
-			}
-		}
-		else
-		{
-			$this->error = 'No post data received.';
-		}
-
-		return false;
-	}
-
-	/**
 	 * @param int $amount
-	 * @param array $data
 	 * @param string $description
-	 * @param string $action
-	 * @return bool|null|string
+	 * @param string|null $action unused
+	 * @return bool|null
+	 */
+	public function refundCredits ($amount, $description, $action = null)
+	{
+		if (!$this->objCredits) {
+			return null;
+		}
+
+		$auth = Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance ()->getForPlayer ($this->objUser);
+		if ($auth === null || $auth['profile_id'] === null) {
+			return false;
+		}
+
+		try
+		{
+			return $this->objCredits->refund ((int) $auth['profile_id'], (int) $amount, (string) $description, null);
+		}
+		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
+		{
+			return false;
+		}
+		catch (Neuron_GameServer_Credits_AccountsRejected $e)
+		{
+			return false;
+		}
+	}
+
+	/**
+	 * Local start link. The price and the action are decided server side when
+	 * the link is followed; $amount and $description are not used.
+	 *
+	 * @param int $amount unused
+	 * @param array $data
+	 * @param string $description unused
+	 * @param string $action unused
+	 * @return null|string
 	 */
 	public function getUseUrl ($amount = 1, $data = array (), $description = 'Premium features', $action = 'premium')
 	{
@@ -225,41 +172,7 @@ class Neuron_GameServer_Credits
 			return null;
 		}
 
-		$callback = API_FULL_URL.'spendCredit/'.
-			'?key='.md5($this->getEmail()).
-			'&id='.$this->objUser->getId();
-
-		foreach ($data as $k => $v)
-		{
-			$callback .= '&' . urlencode ($k) . '=' . urlencode ($v);
-		}
-
-		try
-		{
-			return $this->objCredits->requestCredits ($amount, $description, $callback, $action);
-		}
-		catch (BadMethodCallException $e)
-		{
-			$this->error = 'email_not_set';
-			return false;
-		}
-	}
-
-	/**
-	 * @param int $amount
-	 * @return mixed
-	 */
-	private function getConvertData ($amount = 1)
-	{
-		if (!$this->objCredits) {
-			// Credits service not configured: no conversion possible.
-			return array ('amount' => $amount, 'text' => (string) $amount, 'html' => (string) $amount);
-		}
-
-		if (!isset ($this->convertcache[$amount])) {
-			$this->convertcache[$amount] = $this->objCredits->convert ($amount);
-		}
-		return $this->convertcache[$amount];
+		return API_FULL_URL . 'creditstart/?' . http_build_query ($data);
 	}
 
 	/**
@@ -268,8 +181,7 @@ class Neuron_GameServer_Credits
 	 */
 	public function convertCredits ($amount = 1)
 	{
-		$data = $this->getConvertData ($amount);
-		return $data['amount'];
+		return $amount;
 	}
 
 	/**
@@ -279,26 +191,40 @@ class Neuron_GameServer_Credits
 	 */
 	public function getCreditDisplay ($amount, $html = false)
 	{
-		$data = $this->getConvertData ($amount);
-		return $html ? $data['html'] : $data['text'];
+		return (string) $amount;
 	}
 
 	/**
+	 * Tracker links still use the legacy BrowserGamesHub signing, guarded by
+	 * its own constants (unset in production).
+	 *
 	 * @param $sTracker $sTracker ID of the tracker, for example: "registration"
 	 * @return null|string
 	 * @throws Exception
 	 */
 	public function getTrackerUrl ($sTracker)
 	{
-		if (!$this->objCredits) {
+		if (!defined ('CREDITS_GAME_TOKEN') || !defined ('CREDITS_PRIVATE_KEY') || !class_exists ('BBGS_Credits')) {
 			return null;
 		}
 
-		if (!$this->objCredits->isValidData()) {
+		$legacy = new BBGS_Credits (CREDITS_GAME_TOKEN);
+		$legacy->setPrivateKey (CREDITS_PRIVATE_KEY);
+
+		if ($this->objUser->isEmailCertified ()) {
+			$legacy->setEmail (trim (strtolower ($this->objUser->getEmail ())));
+		}
+		$legacy->setReferal ($this->objUser->getReferal ());
+		foreach ($this->objUser->getOpenIDs () as $v) {
+			$legacy->addOpenID ($v);
+		}
+		$legacy->setUserId ($this->objUser->getId ());
+
+		if (!$legacy->isValidData ()) {
 			return null;
 		}
 
-		return $this->objCredits->getTrackerUrl ($sTracker);
+		return $legacy->getTrackerUrl ($sTracker);
 	}
 
 	/**

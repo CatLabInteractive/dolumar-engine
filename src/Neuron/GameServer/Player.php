@@ -1213,15 +1213,6 @@ class Neuron_GameServer_Player
         return $this->objCredits->getTrackerUrl ($tracker);
     }
 
-    public function handleUseRequest ($data, $id, $key)
-    {
-        $this->loadCredits ();
-        $result = $this->objCredits->handleUseRequest ($data, $id, $key);
-        $this->error = $this->objCredits->getError ();
-
-        return $result;
-    }
-
     /*
         Vacation mode
     */

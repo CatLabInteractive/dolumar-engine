@@ -41,6 +41,10 @@ class Neuron_GameServer_Pages_Admin_Premium extends Neuron_GameServer_Pages_Admi
 		$refund = $refund == 1;
 		
 		$page = new Neuron_Core_Template ();
+
+		$client = Neuron_GameServer_Credits_AccountsClient::fromConfig ();
+		$service = $client ? new Neuron_GameServer_Credits_PurchaseService ($client) : null;
+		$skipped = array ();
 		
 		foreach ($data as $v)
 		{
@@ -54,7 +58,25 @@ class Neuron_GameServer_Pages_Admin_Premium extends Neuron_GameServer_Pages_Admi
 			
 			if ($refund)
 			{
-				$amref = $player->refundCredits ($credits, 'premium account refund');
+				// Only granted purchases with action premium can be refunded.
+				$amref = false;
+				$found = false;
+				if ($service)
+				{
+					foreach ($service->getPlayerPurchases ($player) as $purchase)
+					{
+						$action = $purchase['action_data']['action'] ?? '';
+						if ($purchase['status'] === 'granted' && ($action === '' || $action === 'premium'))
+						{
+							$found = true;
+							$amref = $service->refundPurchase ($purchase['id'], 'premium account refund') || $amref;
+						}
+					}
+				}
+				if (!$found)
+				{
+					$skipped[] = $player->getDisplayName ();
+				}
 			}
 			else
 			{
@@ -74,7 +96,15 @@ class Neuron_GameServer_Pages_Admin_Premium extends Neuron_GameServer_Pages_Admi
 			);
 		}
 		
-		return $page->parse ('pages/admin/premium/premium.phpt');
+		$out = $page->parse ('pages/admin/premium/premium.phpt');
+
+		if (count ($skipped) > 0)
+		{
+			$out .= '<p>Skipped (no granted premium purchase to refund): ';
+			$out .= htmlspecialchars (implode (', ', $skipped)) . '</p>';
+		}
+
+		return $out;
 	}
 }
 ?>
