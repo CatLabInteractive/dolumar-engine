@@ -11,6 +11,7 @@ class FakeCreditsClient extends Neuron_GameServer_Credits_AccountsClient
 	public $createThrows = null;
 	public $refundResult = true;
 	public $nextId = 5001;
+	public $onGetRequest = null;
 
 	public function __construct () {}
 
@@ -29,6 +30,7 @@ class FakeCreditsClient extends Neuron_GameServer_Credits_AccountsClient
 	public function getRequest (int $requestId): ?array
 	{
 		if ($this->getRequestThrows) { throw $this->getRequestThrows; }
+		if ($this->onGetRequest) { $cb = $this->onGetRequest; $this->onGetRequest = null; $cb (); }
 		return $this->requests[$requestId] ?? null;
 	}
 
@@ -300,5 +302,88 @@ class PurchaseServiceTest extends TestCase
 		$this->assertFalse ($this->service->refundPurchase ($pid, 'support'));
 		$this->assertCount (1, $this->client->refunds);
 		$this->assertSame ('refunded', $this->rowStatus ($id));
+	}
+
+	public function testConcurrentNotifiesGrantOnce (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$inner = null;
+		// Re-enter while the outer call still holds a stale 'pending' row.
+		$this->client->onGetRequest = function () use ($id, &$inner) { $inner = $this->service->handleNotify ($id); };
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		$this->assertSame ('granted', $inner);
+		$this->assertSame (1, $this->useCalls);
+		$this->assertSame ([], $this->client->refunds);
+		$this->assertSame ('granted', $this->rowStatus ($id));
+	}
+
+	public function testConcurrentLateNotifiesRefundOnce (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->clock += 3601;
+		$inner = null;
+		$this->client->onGetRequest = function () use ($id, &$inner) { $inner = $this->service->handleNotify ($id); };
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		$this->assertSame ('refunded', $inner);
+		$this->assertCount (1, $this->client->refunds);
+		$this->assertSame (0, $this->useCalls);
+	}
+
+	public function testConcurrentInapplicableRefundsOnce (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->useResult = false;
+		$this->client->onGetRequest = function () use ($id) { $this->service->handleNotify ($id); };
+		$this->service->handleNotify ($id);
+		$this->assertCount (1, $this->client->refunds);
+		$this->assertSame (1, $this->useCalls);
+	}
+
+	public function testPastExpiryMismatchBecomesFailedAndLeavesQueue (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id, 1);
+		$this->assertSame (0, $this->service->reconcile ());
+		$this->assertSame ('pending', $this->rowStatus ($id));
+		$this->clock += 3601;
+		$prev = ini_set ('error_log', '/dev/null');
+		$this->assertSame (1, $this->service->reconcile ());
+		ini_set ('error_log', $prev);
+		$this->assertSame ('failed', $this->rowStatus ($id));
+		$this->assertSame (0, $this->service->reconcile ());
+		$this->assertSame ([], $this->client->refunds);
+	}
+
+	public function testNotFoundPastExpiryFails (): void
+	{
+		$id = $this->started ();
+		unset ($this->client->requests[$id]);
+		$prev = ini_set ('error_log', '/dev/null');
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		$this->assertSame ('pending', $this->rowStatus ($id));
+		$this->clock += 3601;
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		ini_set ('error_log', $prev);
+		$this->assertSame ('failed', $this->rowStatus ($id));
+	}
+
+	public function testStuckRowsDoNotStarveReconcile (): void
+	{
+		$prev = ini_set ('error_log', '/dev/null');
+		$stuck = [];
+		for ($i = 0; $i < 3; $i ++) { $stuck[] = $this->started (); $this->accept ($stuck[$i], 1); $this->clock += 1; }
+		$good = $this->started ();
+		$this->accept ($good);
+		// limit 3: the three older stuck rows fill the first batch, then rotate behind.
+		$this->clock += 1;
+		$this->service->reconcile (3);
+		$this->assertSame ('pending', $this->rowStatus ($good));
+		$this->clock += 1;
+		$this->assertSame (1, $this->service->reconcile (3));
+		ini_set ('error_log', $prev);
+		$this->assertSame ('granted', $this->rowStatus ($good));
 	}
 }

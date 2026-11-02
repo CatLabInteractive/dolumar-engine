@@ -117,7 +117,9 @@ class Neuron_GameServer_Credits_PurchaseService
 		{
 			return 'ignored';
 		}
-		return $this->settle ($purchase, false);
+		$result = $this->settle ($purchase, false);
+		// 'expired' / 'failed' are internal outcomes of the reconcile path.
+		return $result === 'expired' ? 'pending' : ($result === 'failed' ? 'ignored' : $result);
 	}
 
 	/**
@@ -131,8 +133,9 @@ class Neuron_GameServer_Credits_PurchaseService
 		$settled = 0;
 		foreach ($rows as $row)
 		{
+			$mapper->touch ($row['id'], $this->format ($this->now ()));
 			$result = $this->settle ($row, true);
-			if (in_array ($result, ['granted', 'refunded', 'expired'], true))
+			if (in_array ($result, ['granted', 'refunded', 'expired', 'failed'], true))
 			{
 				$settled ++;
 			}
@@ -195,12 +198,13 @@ class Neuron_GameServer_Credits_PurchaseService
 		{
 			// Likely a bad client secret: leave the row alone, shout, never grant or refund.
 			error_log ('Credits: Accounts rejected getRequest ' . $requestId . ' (HTTP ' . $e->getStatus () . ')');
+			$mapper->touch ($purchase['id'], $this->format ($this->now ()));
 			return 'pending';
 		}
 
 		if ($request === null)
 		{
-			return 'ignored';
+			return $this->unsettleable ($purchase, $from, 'request not found on Accounts');
 		}
 
 		if (strtoupper ((string) ($request['status'] ?? '')) !== 'ACCEPTED')
@@ -218,8 +222,7 @@ class Neuron_GameServer_Credits_PurchaseService
 
 		if ((int) ($request['credits'] ?? -1) !== $purchase['credits'] || $profileId === null || $requestProfileId !== $profileId)
 		{
-			error_log ('Credits: mismatching accepted request ' . $requestId . ' for purchase ' . $purchase['id'] . ', ignored');
-			return 'ignored';
+			return $this->unsettleable ($purchase, $from, 'accepted request does not match purchase credits/profile');
 		}
 
 		if ($this->isExpired ($purchase))
@@ -261,6 +264,22 @@ class Neuron_GameServer_Credits_PurchaseService
 		}
 		$this->issueRefund ($purchase, $profileId, 'Action could not be applied');
 		return 'refunded';
+	}
+
+	/**
+	 * A row that cannot be matched to its request: ignore while the purchase
+	 * is live, fail it for good once past expiry so it cannot clog reconcile.
+	 */
+	private function unsettleable (array $purchase, string $from, string $reason): string
+	{
+		error_log ('Credits: purchase ' . $purchase['id'] . ' request ' . $purchase['credit_request_id'] . ': ' . $reason);
+		if ($this->isExpired ($purchase)
+			&& Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()->transition ($purchase['id'], $from, 'failed', $this->format ($this->now ())))
+		{
+			error_log ('Credits: purchase ' . $purchase['id'] . ' request ' . $purchase['credit_request_id'] . ' marked failed (' . $reason . ')');
+			return 'failed';
+		}
+		return 'ignored';
 	}
 
 	private function claimAndRefund (array $purchase, string $from, int $profileId, string $reason): string

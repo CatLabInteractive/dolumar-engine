@@ -53,6 +53,15 @@ class Neuron_GameServer_Mappers_CreditPurchaseMapper
 		return $db->getAffectedRows () === 1;
 	}
 
+	/**
+	 * Mark a row as examined so retried rows rotate to the back of the queue.
+	 */
+	public function touch (int $id, string $now): void
+	{
+		$db = Neuron_DB_Database::getInstance ();
+		$db->query ("UPDATE n_credit_purchases SET updated_at = '" . $db->escape ($now) . "' WHERE id = " . (int) $id);
+	}
+
 	public function get (int $id): ?array
 	{
 		return $this->fetchOne ("WHERE id = " . (int) $id);
@@ -72,8 +81,8 @@ class Neuron_GameServer_Mappers_CreditPurchaseMapper
 		$db = Neuron_DB_Database::getInstance ();
 		return $this->fetchAll
 		(
-			"WHERE credit_request_id IS NOT NULL AND (status = 'pending' OR (status = 'expired' AND updated_at >= '"
-			. $db->escape ($expiredSince) . "')) ORDER BY id ASC LIMIT " . max (1, $limit)
+			"WHERE credit_request_id IS NOT NULL AND (status = 'pending' OR (status = 'expired' AND expires_at >= '"
+			. $db->escape ($expiredSince) . "')) ORDER BY updated_at ASC, id ASC LIMIT " . max (1, $limit)
 		);
 	}
 
