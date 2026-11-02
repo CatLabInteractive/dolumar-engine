@@ -41,6 +41,10 @@ function TiledImageViewer(
     this.canPinch = null;
     this.onscale = null;
 
+    // Optional hook: isTouchLayout() says whether selectLocation uses the touch flow
+    // (ghost fixed at the centre, Place/Cancel buttons) instead of the mouse flow.
+    this.isTouchLayout = null;
+
     this.div = document.createElement('div');
 
     this.el.appendChild(this.div);
@@ -389,6 +393,11 @@ TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image)
     var self = this;
     this.selecting = true;
 
+    if (typeof(this.isTouchLayout) == 'function' && this.isTouchLayout()) {
+        this.selectLocationTouch(callback, onFinish, image);
+        return;
+    }
+
     this.el.onmousedown = TIV_selectLocation;
     this.el.onmouseup = function (e) {
         self.el.onmousedown = null;
@@ -438,6 +447,82 @@ TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image)
         4 = offsetY
     */
 }
+
+// Touch flow: the ghost stays at the centre of the map, the player pans the map under it
+// and confirms with Place (or Cancel). No overlay, so panning keeps working.
+TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, image) {
+    var self = this;
+
+    this.selLocAct = callback;
+    this.onFinish = onFinish;
+
+    var pointer = this.el.tivpointer;
+    if (pointer && typeof(image) != 'undefined' && image != null) {
+        this.updatePointerBackgroundImage(image);
+
+        var rect = this.el.getBoundingClientRect();
+        pointer.style.position = 'fixed';
+        pointer.style.left = (rect.left + rect.width / 2) + 'px';
+        pointer.style.top = (rect.top + rect.height / 2) + 'px';
+        pointer.style.pointerEvents = 'none';
+        pointer.style.transformOrigin = 'center';
+        pointer.style.transform = 'translate(-50%, -50%) scale(' + this.scale + ')';
+    }
+
+    this.removeSelectActions();
+
+    var actions = document.createElement('div');
+    actions.id = 'map_select_actions';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'cancel';
+    cancel.appendChild(document.createTextNode('Cancel'));
+    cancel.onclick = function () {
+        self.cancelLocationClick();
+        return false;
+    };
+
+    var place = document.createElement('button');
+    place.type = 'button';
+    place.className = 'place';
+    place.appendChild(document.createTextNode('Place'));
+    place.onclick = function () {
+        self.placeAtCenter();
+        return false;
+    };
+
+    // The map's own touchstart/mousedown handlers cancel the default action (no click
+    // would follow) and start a drag; keep them away from the buttons.
+    var stop = function (e) {
+        if (e.stopPropagation) e.stopPropagation();
+        e.cancelBubble = true;
+    };
+    actions.addEventListener('touchstart', stop, false);
+    actions.addEventListener('touchend', stop, false);
+    actions.addEventListener('mousedown', stop, false);
+    actions.addEventListener('mouseup', stop, false);
+
+    actions.appendChild(cancel);
+    actions.appendChild(place);
+    this.el.appendChild(actions);
+};
+
+// Touch flow: choose the map point under the centre of the viewer.
+TiledImageViewer.prototype.placeAtCenter = function () {
+    var rect = this.el.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+
+    return this.selectLocationClick(cx, cy);
+};
+
+TiledImageViewer.prototype.removeSelectActions = function () {
+    var actions = document.getElementById('map_select_actions');
+    if (actions && actions.parentNode) {
+        actions.parentNode.removeChild(actions);
+    }
+};
 
 TiledImageViewer.prototype.drawOverlay = function() {
 
@@ -513,7 +598,17 @@ TiledImageViewer.prototype.cancelLocationClick = function (x, y) {
 
     if (this.el.tivpointer) {
         this.el.tivpointer.style.display = 'none';
+
+        // Undo the touch flow's placement so the mouse flow starts as before.
+        if (this.el.tivpointer.style.position == 'fixed') {
+            this.el.tivpointer.style.position = 'absolute';
+            this.el.tivpointer.style.transform = '';
+            this.el.tivpointer.style.transformOrigin = '';
+            this.el.tivpointer.style.pointerEvents = '';
+        }
     }
+
+    this.removeSelectActions();
 
     window.onmousemove = '';
     this.enableControls();

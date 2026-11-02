@@ -369,6 +369,12 @@ Game.map =
 			Game.map.setScale (s);
 		};
 
+		// Choosing a location: the mobile layout uses the touch flow (Place/Cancel buttons).
+		Game.map.oScrollMap.isTouchLayout = function ()
+		{
+			return Game.layout.mode () === 'mobile';
+		};
+
 		Game.map.applyStoredScale ();
 
 		// The desktop layout always shows the map at scale 1.
