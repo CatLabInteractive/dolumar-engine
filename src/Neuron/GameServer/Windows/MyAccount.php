@@ -263,6 +263,7 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			
 			$page->set ('todo', $text->get ('todo'));
 			$page->set ('logout', $text->get ('logout'));
+			$page->set ('layout', $me->getPreference ('layout', Neuron_GameServer::LAYOUT_DEFAULT));
 			
 			if ($this->canChangePassword ())
 			{
@@ -472,6 +473,19 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 	
 	private function processIngameInput ($data)
 	{
+		if
+		(
+			isset ($data['action']) &&
+			$data['action'] === 'layout' &&
+			isset ($data['layout']) &&
+			is_string ($data['layout']) &&
+			in_array ($data['layout'], Neuron_GameServer::LAYOUT_VALUES, true)
+		)
+		{
+			Neuron_GameServer::getPlayer ()->setPreference ('layout', $data['layout']);
+			return $this->reloadWindow ();
+		}
+
 		return $this->updateContent ($this->showMyAccount ());
 	}
 

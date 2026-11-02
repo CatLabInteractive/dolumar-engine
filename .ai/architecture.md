@@ -41,6 +41,18 @@ Windows are the core UI unit. Every window extends `Neuron_GameServer_Windows_Wi
 `setSettings()`, renders in `getContent()`, handles posts in `processInput()` and polling in `getRefresh()`. The
 `dialog` route turns client AJAX calls into window calls and returns XML.
 
+## Layout modes and sheets
+
+The client has two layout modes. `assets/javascript/layout.js` (`Game.layout`) resolves the `layout` preference
+(`auto`, `desktop` or `mobile`; default `Neuron_GameServer::LAYOUT_DEFAULT`, stored per player and changed from
+the account window with `action=layout`, or overridden for one request with `?layout=`) into `body.layout-mobile`
+or `body.layout-desktop`. `auto` switches at a width of 800 CSS pixels. In mobile mode `assets/javascript/sheets.js`
+(`Game.sheets`) renders the same windows the `dialog` route returns as full-width stacked sheets instead of
+draggable windows; `Game.gui.relayoutWindows(mode)` moves open windows between the two presentations. The map
+scale in `assets/javascript/scrollmap.js` is a client-side CSS scale (0.5 to 1.5, pinch or buttons) applied on top
+of the tile size the server renders; `Game.map.setScale` stores it in `localStorage` and corrects the width used
+for the `auto` breakpoint. The game supplies its own mobile chrome (header, tab bar) on top of these primitives.
+
 ## Configuration
 
 The engine reads configuration from PHP constants that the game's bootstrap defines from environment variables
