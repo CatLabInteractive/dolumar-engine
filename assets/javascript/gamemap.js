@@ -357,6 +357,12 @@ Game.map =
 		);
 		
 		Game.map.oScrollMap.enableControls ();
+
+		// Moving objects (armies) live in their own layer on top of the regions
+		if (typeof (Game.armies) != 'undefined')
+		{
+			Game.armies.init ();
+		}
 	},
 	
 	/* Region drawing */
@@ -401,6 +407,12 @@ Game.map =
 		
 		// Don't forget to clean the que
 		Game.map.aRegionsToLoad = new Array ();
+
+		// New regions on screen: refresh the moving objects for them
+		if (typeof (Game.armies) != 'undefined')
+		{
+			Game.armies.poll ();
+		}
 	},
 	
 	'isImageLoaded' : function (imgdetails)

@@ -68,3 +68,68 @@ div.minimap
 	left: 0px;
 	border: 1px solid black;
 }
+
+/* Moving objects (armies) layer, see javascript/armies.js */
+div.armies
+{
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 0;
+	height: 0;
+	overflow: visible;
+	z-index: 20;
+	pointer-events: none;
+}
+
+div.armies canvas.armies-routes
+{
+	position: absolute;
+	pointer-events: none;
+}
+
+div.armies div.army
+{
+	position: absolute;
+	width: 40px;
+	height: 40px;
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	pointer-events: auto;
+}
+
+div.armies div.army.facing-left
+{
+	background-position: -40px 0;
+}
+
+div.armies div.army.clickable
+{
+	cursor: pointer;
+}
+
+div.armies div.army-label
+{
+	position: absolute;
+	min-width: 120px;
+	padding: 4px 8px;
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	font-size: 12px;
+	border-radius: 4px;
+	pointer-events: auto;
+	z-index: 21;
+}
+
+div.armies div.army-label p
+{
+	margin: 0 0 4px 0;
+}
+
+div.armies div.army-label a
+{
+	display: inline-block;
+	min-height: 32px;
+	line-height: 32px;
+	color: #ffd700;
+}
