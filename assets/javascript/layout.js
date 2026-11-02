@@ -86,6 +86,12 @@ Game.layout = {
 		}
 	},
 
+	'setPreference' : function (value)
+	{
+		Game.layout.preference = value;
+		Game.layout.apply ();
+	},
+
 	'onChange' : function (fn)
 	{
 		Game.layout.callbacks.push (fn);

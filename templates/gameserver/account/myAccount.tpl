@@ -31,6 +31,15 @@
 	</li>
 </ul>
 
+<h2><?=$this->getText ('layout')?></h2>
+<form onsubmit="return false;">
+	<select name="layout" onchange="Game.layout.setPreference(this.value); submitForm(this.form, {'action':'layout'}); return false;">
+		<?php foreach (array ('auto' => 'layoutAuto', 'desktop' => 'layoutDesktop', 'mobile' => 'layoutMobile') as $value => $key) { ?>
+			<option value="<?=$value?>"<?php if ($layout === $value) { echo ' selected="selected"'; } ?>><?=$this->getText ($key)?></option>
+		<?php } ?>
+	</select>
+</form>
+
 <ul style="margin-top: 8px;">
 	<li>
 		&raquo; <a href="<?=ABSOLUTE_URL?>?logout=true"><?=$logout?></a>
