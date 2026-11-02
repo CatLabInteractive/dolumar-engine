@@ -122,6 +122,12 @@ Game.gui =
 		
 		// Close key
 		WindowCloseKey.init();
+
+		// Move open windows between Prototype windows and sheets when the layout mode changes.
+		if (Game.layout && Game.layout.onChange)
+		{
+			Game.layout.onChange (Game.gui.relayoutWindows);
+		}
 		
 		// Call "initialize" tracker
 		Game.gui.trackIt ('loading');
@@ -1105,6 +1111,9 @@ Game.gui =
 			'oWindow' : win,
 			'oSheet' : oSheet,
 			'settings' : settings,
+			'className' : className,
+			'modal' : modal,
+			'center' : center,
 			'sInputData' : '{}',
 			'iPollInterval' : iPollInterval,
 			'sPool' : sPool
@@ -1154,6 +1163,122 @@ Game.gui =
 		fOnLoad ();
 	},
 	
+	/*
+		Called when the layout mode changes: turn every open window into a
+		sheet (mode 'mobile') or every sheet back into a Prototype window
+		(mode 'desktop'). The window entries themselves stay in
+		aOpenWindows with the same dialog ids, so polling is unaffected.
+		Panels and invisible windows (no oWindow, no oSheet) are left alone.
+	*/
+	'relayoutWindows' : function (mode)
+	{
+		var windows = Game.gui.aOpenWindows;
+
+		for (var i = 0; i < windows.length; i ++)
+		{
+			var entry = windows[i];
+
+			if (mode == 'mobile' && entry.oWindow)
+			{
+				Game.gui.windowToSheet (entry);
+			}
+			else if (mode == 'desktop' && entry.oSheet)
+			{
+				Game.gui.sheetToWindow (entry);
+			}
+		}
+
+		if (Game.gui.oDialog)
+		{
+			Game.gui.oDialog.toFront ();
+		}
+	},
+
+	/*
+		Move the children of the entry's content element into a new content
+		element, which then becomes entry.div (with the marks that
+		getWindowFromElement and the window CSS need).
+	*/
+	'moveWindowContent' : function (entry, target)
+	{
+		target = $(target);
+
+		while (entry.div.firstChild)
+		{
+			target.appendChild (entry.div.firstChild);
+		}
+
+		target.dialogId = entry.sDialogId;
+		target.addClassName ('guiwindow');
+
+		if (entry.className)
+		{
+			target.addClassName (entry.className);
+		}
+
+		entry.div = target;
+	},
+
+	'windowToSheet' : function (entry)
+	{
+		var win = entry.oWindow;
+
+		var sheet = Game.sheets.open ({
+			dialogId :	entry.sDialogId,
+			title :		entry.settings.title,
+			closable :	entry.settings.closable,
+			modal :		entry.modal,
+			className :	entry.className
+		});
+
+		Game.gui.moveWindowContent (entry, sheet.content);
+
+		// Destroy the window without forgetting the entry.
+		win.options.onDestroy = null;
+		if (win.modal)
+		{
+			// Drop the modal overlay; destroy () alone leaves it behind.
+			win.doNotNotifyHide = true;
+			win.hide ();
+		}
+		win.destroy ();
+
+		entry.oWindow = null;
+		entry.oSheet = sheet;
+	},
+
+	'sheetToWindow' : function (entry)
+	{
+		var win = new Window (entry.settings);
+
+		if (entry.className)
+		{
+			$(win.element).addClassName (entry.className);
+			win._getWindowBorderSize ();
+		}
+
+		Game.gui.moveWindowContent (entry, win.getContent ());
+
+		// Remove the sheet without calling destroyWindow.
+		Game.sheets.close (entry.oSheet);
+
+		entry.oSheet = null;
+		entry.oWindow = win;
+
+		win.setConstraint (true, {top: 31, bottom: 0, left: 0, right: 0});
+
+		if (entry.center)
+		{
+			win.showCenter (entry.modal);
+		}
+		else
+		{
+			win.show (entry.modal);
+		}
+
+		win.toFront ();
+	},
+
 	'destroyWindow' : function (dialog, isTrigger)
 	{
 		if (typeof (dialog) == 'string')

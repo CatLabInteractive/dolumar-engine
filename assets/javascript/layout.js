@@ -24,6 +24,17 @@ Game.layout = {
 		return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 	},
 
+	/*
+		0.5 while the desktop-on-touch viewport meta is applied, else 1.
+	*/
+	'currentScale' : function ()
+	{
+		var meta = document.getElementById ('viewport');
+		var content = meta ? (meta.getAttribute ('content') || '') : '';
+
+		return content.indexOf ('initial-scale=0.5') >= 0 ? 0.5 : 1;
+	},
+
 	'mode' : function ()
 	{
 		var pref = Game.layout.preference;
@@ -35,7 +46,8 @@ Game.layout = {
 
 		if (pref == 'auto')
 		{
-			return window.innerWidth < Game.layout.BREAKPOINT ? 'mobile' : 'desktop';
+			// Under the 0.5-scale viewport innerWidth is doubled; compare the width at scale 1.
+			return window.innerWidth * Game.layout.currentScale () < Game.layout.BREAKPOINT ? 'mobile' : 'desktop';
 		}
 
 		return 'desktop';
