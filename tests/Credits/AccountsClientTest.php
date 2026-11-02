@@ -93,6 +93,26 @@ class AccountsClientTest extends TestCase
 		$client->getBalance ('tok');
 	}
 
+	public function testCreateRequestClientErrorIsRejected (): void
+	{
+		$client = $this->client ([new Response (422, [], json_encode (['error' => 'Bad notify url']))]);
+		try {
+			$client->createRequest ('tok', 42, 100, 'r', 'n', 'u', []);
+			$this->fail ('Expected AccountsRejected');
+		} catch (Neuron_GameServer_Credits_AccountsRejected $e) {
+			$this->assertSame (422, $e->getStatus ());
+			$this->assertNotInstanceOf (Neuron_GameServer_Credits_AccountsUnavailable::class, $e);
+			$this->assertStringNotContainsString ('tok', str_replace ('Bad notify url', '', $e->getMessage ()));
+		}
+	}
+
+	public function testGetRequestUnauthorizedIsRejected (): void
+	{
+		$client = $this->client ([new Response (401, [], '{}')]);
+		$this->expectException (Neuron_GameServer_Credits_AccountsRejected::class);
+		$client->getRequest (9);
+	}
+
 	public function testBuyUrl (): void
 	{
 		if (!defined ('CATLAB_CREDITS_TYPE_ID')) {

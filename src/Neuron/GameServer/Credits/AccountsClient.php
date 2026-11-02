@@ -12,6 +12,26 @@ class Neuron_GameServer_Credits_AccountsUnavailable extends RuntimeException
 }
 
 /**
+ * Thrown when Accounts rejects a request with a 4xx (a permanent failure,
+ * unlike AccountsUnavailable). The message never contains secrets.
+ */
+class Neuron_GameServer_Credits_AccountsRejected extends RuntimeException
+{
+	private int $status;
+
+	public function __construct (int $status, string $message = '')
+	{
+		parent::__construct ($message !== '' ? $message : 'Accounts rejected the request (HTTP ' . $status . ').', $status);
+		$this->status = $status;
+	}
+
+	public function getStatus (): int
+	{
+		return $this->status;
+	}
+}
+
+/**
  * HTTP client for the credits API of CatLab Accounts.
  * Never put access tokens or the client secret in exception messages or logs.
  */
@@ -84,11 +104,11 @@ class Neuron_GameServer_Credits_AccountsClient
 				'return' => $returnUrl,
 				'extra' => $extra,
 			]
-		]);
+		], true);
 
 		if (!isset ($data['id'], $data['confirmUrl']))
 		{
-			throw new Neuron_GameServer_Credits_AccountsUnavailable ('Accounts refused the credit request.');
+			throw new Neuron_GameServer_Credits_AccountsUnavailable ('Accounts returned an invalid credit request.');
 		}
 
 		return ['id' => (int)$data['id'], 'confirmUrl' => (string)$data['confirmUrl']];
@@ -102,7 +122,7 @@ class Neuron_GameServer_Credits_AccountsClient
 
 	public function getRequest (int $requestId): ?array
 	{
-		return $this->send ('GET', 'api/1.0/credits/requests/' . $requestId, $this->basic ());
+		return $this->send ('GET', 'api/1.0/credits/requests/' . $requestId, $this->basic (), true, [404]);
 	}
 
 	public function refund (int $profileId, int $credits, string $reason, ?int $creditRequestId): bool
@@ -130,8 +150,9 @@ class Neuron_GameServer_Credits_AccountsClient
 	/**
 	 * @return array|null decoded body, null on 4xx
 	 * @throws Neuron_GameServer_Credits_AccountsUnavailable on network failure or 5xx
+	 * @throws Neuron_GameServer_Credits_AccountsRejected on 4xx when $rejectOnClientError (except $nullStatuses)
 	 */
-	private function send (string $method, string $path, array $options): ?array
+	private function send (string $method, string $path, array $options, bool $rejectOnClientError = false, array $nullStatuses = []): ?array
 	{
 		$options['http_errors'] = false;
 
@@ -152,6 +173,12 @@ class Neuron_GameServer_Credits_AccountsClient
 		}
 		if ($status >= 400)
 		{
+			if ($rejectOnClientError && !in_array ($status, $nullStatuses, true))
+			{
+				$error = json_decode ((string)$response->getBody (), true);
+				$text = is_array ($error) && isset ($error['error']) && is_string ($error['error']) ? $error['error'] : '';
+				throw new Neuron_GameServer_Credits_AccountsRejected ($status, $text !== '' ? 'Accounts rejected the request (HTTP ' . $status . '): ' . $text : '');
+			}
 			return null;
 		}
 
