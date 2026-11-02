@@ -129,7 +129,7 @@
 		//-----------------------------------------------------------------------------
 		// Constructor.
 
-		function BBCode() {
+		function __construct() {
 			$this->defaults = new BBCodeLibrary;
 			$this->tag_rules = $this->defaults->default_tag_rules;
 			$this->smileys = $this->defaults->default_smileys;

@@ -52,7 +52,7 @@ class Neuron_GameServer_Windows_MapUpdater extends Neuron_GameServer_Windows_Win
 		$last = $db->query
 		("
 			SELECT
-				MAX(mu_id) AS laatste
+				COALESCE(MAX(mu_id), 0) AS laatste
 			FROM
 				n_map_updates
 		");
