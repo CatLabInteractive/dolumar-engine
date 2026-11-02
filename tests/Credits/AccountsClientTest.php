@@ -79,6 +79,35 @@ class AccountsClientTest extends TestCase
 		$this->assertFalse ($client->refund (42, 100, 'why', null));
 	}
 
+	public function testRefundRequestOutcomes (): void
+	{
+		$exceeds = json_encode (['error' => ['message' => 'Refund exceeds the purchase: 100 charged, 100 already refunded.']]);
+		$client = $this->client ([
+			new Response (200, [], '{"success":true}'),
+			new Response (400, [], $exceeds),
+			new Response (400, [], json_encode (['error' => ['message' => 'credit_request_id is not an accepted purchase on this profile.']])),
+			new Response (502, [], ''),
+		]);
+
+		$this->assertSame ('refunded', $client->refundRequest (42, 100, 'why', 7));
+		$body = json_decode ((string)$this->history[0]['request']->getBody (), true);
+		$this->assertSame (['credits' => 100, 'reason' => 'why', 'credit_request_id' => 7], $body);
+		$this->assertSame ('/api/1.0/profiles/42/credits/refund', $this->history[0]['request']->getUri ()->getPath ());
+
+		$this->assertSame ('already_refunded', $client->refundRequest (42, 100, 'why', 7));
+
+		try {
+			$client->refundRequest (42, 100, 'why', 7);
+			$this->fail ('Expected AccountsRejected');
+		} catch (Neuron_GameServer_Credits_AccountsRejected $e) {
+			$this->assertSame (400, $e->getStatus ());
+			$this->assertStringContainsString ('not an accepted purchase', $e->getMessage ());
+		}
+
+		$this->expectException (Neuron_GameServer_Credits_AccountsUnavailable::class);
+		$client->refundRequest (42, 100, 'why', 7);
+	}
+
 	public function testServerErrorThrowsUnavailable (): void
 	{
 		$client = $this->client ([new Response (503, [], '')]);

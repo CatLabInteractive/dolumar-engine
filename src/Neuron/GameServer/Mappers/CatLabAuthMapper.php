@@ -17,7 +17,8 @@ class Neuron_GameServer_Mappers_CatLabAuthMapper
 	}
 
 	/**
-	 * Insert or replace the stored token for an openid url.
+	 * Insert or replace the stored token for an openid url. A null profile id
+	 * (failed lookup at login) keeps the profile id already known.
 	 */
 	public function save (string $openIdUrl, ?int $profileId, string $accessToken, string $scope): void
 	{
@@ -30,9 +31,34 @@ class Neuron_GameServer_Mappers_CatLabAuthMapper
 			. ($profileId === null ? 'NULL' : (int) $profileId) . ", "
 			. "'" . $db->escape ($accessToken) . "', "
 			. "'" . $db->escape ($scope) . "', NOW()) "
-			. "ON DUPLICATE KEY UPDATE profile_id = VALUES(profile_id), access_token = VALUES(access_token), "
+			. "ON DUPLICATE KEY UPDATE profile_id = COALESCE(VALUES(profile_id), profile_id), access_token = VALUES(access_token), "
 			. "scope = VALUES(scope), updated_at = VALUES(updated_at)"
 		);
+	}
+
+	/**
+	 * After an OIDC login: store the token and personal profile id, but only
+	 * when credits are configured ($client non-null); otherwise no token is kept.
+	 * A failed profile lookup stores null, which keeps a known profile id.
+	 */
+	public function rememberLogin (?Neuron_GameServer_Credits_AccountsClient $client, string $openIdUrl, string $accessToken, string $scope): void
+	{
+		if ($client === null || $accessToken === '')
+		{
+			return;
+		}
+
+		$profileId = null;
+		try
+		{
+			$profileId = $client->getPersonalProfileId ($accessToken);
+		}
+		catch (Neuron_GameServer_Credits_AccountsUnavailable | Neuron_GameServer_Credits_AccountsRejected $e)
+		{
+			error_log ('OIDC login: personal profile lookup failed: ' . get_class ($e));
+		}
+
+		$this->save ($openIdUrl, $profileId, $accessToken, $scope);
 	}
 
 	/**

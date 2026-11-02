@@ -17,13 +17,17 @@ class Neuron_GameServer_Mappers_CreditPurchaseMapper
 		return $in;
 	}
 
-	public function insert (int $plid, int $credits, string $description, array $actionData, string $createdAt, string $expiresAt): int
+	/**
+	 * @param int $profileId the Accounts profile that will be charged; settle
+	 *                       only grants when Accounts charged exactly this one
+	 */
+	public function insert (int $plid, int $profileId, int $credits, string $description, array $actionData, string $createdAt, string $expiresAt): int
 	{
 		$db = Neuron_DB_Database::getInstance ();
 		$id = $db->query
 		(
-			"INSERT INTO n_credit_purchases (plid, credits, description, action_data, status, created_at, expires_at, updated_at) VALUES ("
-			. (int) $plid . ", " . (int) $credits . ", "
+			"INSERT INTO n_credit_purchases (plid, profile_id, credits, description, action_data, status, created_at, expires_at, updated_at) VALUES ("
+			. (int) $plid . ", " . (int) $profileId . ", " . (int) $credits . ", "
 			. "'" . $db->escape ($description) . "', "
 			. "'" . $db->escape (json_encode ($actionData)) . "', 'pending', "
 			. "'" . $db->escape ($createdAt) . "', '" . $db->escape ($expiresAt) . "', '" . $db->escape ($createdAt) . "')"
@@ -73,15 +77,20 @@ class Neuron_GameServer_Mappers_CreditPurchaseMapper
 	}
 
 	/**
-	 * Purchases that can still be settled: pending, plus recently expired
-	 * ones (a late confirmation on Accounts must be refunded).
+	 * Purchases that can still be settled: pending, recently expired ones (a
+	 * late confirmation on Accounts must be refunded) and refunds that could
+	 * not reach Accounts yet (refund_pending, retried until they succeed).
+	 *
+	 * @param int|null $plid only this player's purchases
 	 */
-	public function getSettleable (int $limit, string $expiredSince): array
+	public function getSettleable (int $limit, string $expiredSince, ?int $plid = null): array
 	{
 		$db = Neuron_DB_Database::getInstance ();
 		return $this->fetchAll
 		(
-			"WHERE credit_request_id IS NOT NULL AND (status = 'pending' OR (status = 'expired' AND expires_at >= '"
+			"WHERE credit_request_id IS NOT NULL "
+			. ($plid === null ? "" : "AND plid = " . (int) $plid . " ")
+			. "AND (status = 'pending' OR status = 'refund_pending' OR (status = 'expired' AND expires_at >= '"
 			. $db->escape ($expiredSince) . "')) ORDER BY updated_at ASC, id ASC LIMIT " . max (1, $limit)
 		);
 	}
@@ -107,6 +116,8 @@ class Neuron_GameServer_Mappers_CreditPurchaseMapper
 			$out[] = [
 				'id' => (int) $row['id'],
 				'plid' => (int) $row['plid'],
+				// NULL only for rows created before the column existed.
+				'profile_id' => isset ($row['profile_id']) ? (int) $row['profile_id'] : null,
 				'credits' => (int) $row['credits'],
 				'description' => (string) $row['description'],
 				'action_data' => is_array ($data) ? $data : [],

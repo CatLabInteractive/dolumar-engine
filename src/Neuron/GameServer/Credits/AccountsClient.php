@@ -142,6 +142,41 @@ class Neuron_GameServer_Credits_AccountsClient
 		return $data !== null && !empty ($data['success']);
 	}
 
+	/**
+	 * Refund (part of) one purchase, with its credit_request_id so Accounts
+	 * caps the total refunded at what was paid.
+	 *
+	 * @return string 'refunded', or 'already_refunded' when Accounts says the
+	 *                refund would exceed the purchase (an earlier attempt went through)
+	 * @throws Neuron_GameServer_Credits_AccountsUnavailable network failure or 5xx: retry later
+	 * @throws Neuron_GameServer_Credits_AccountsRejected any other 4xx: a definitive refusal
+	 */
+	public function refundRequest (int $profileId, int $credits, string $reason, int $creditRequestId): string
+	{
+		try
+		{
+			$data = $this->send ('POST', 'api/1.0/profiles/' . $profileId . '/credits/refund', $this->basic () + ['json' => [
+				'credits' => $credits,
+				'reason' => $reason,
+				'credit_request_id' => $creditRequestId,
+			]], true);
+		}
+		catch (Neuron_GameServer_Credits_AccountsRejected $e)
+		{
+			if ($e->getStatus () === 400 && stripos ($e->getMessage (), 'exceeds the purchase') !== false)
+			{
+				return 'already_refunded';
+			}
+			throw $e;
+		}
+
+		if ($data === null || empty ($data['success']))
+		{
+			throw new Neuron_GameServer_Credits_AccountsRejected (200, 'Accounts did not confirm the refund.');
+		}
+		return 'refunded';
+	}
+
 	private function bearer (string $accessToken): array
 	{
 		return ['headers' => ['Authorization' => 'Bearer ' . $accessToken, 'Accept' => 'application/json']];
@@ -181,7 +216,13 @@ class Neuron_GameServer_Credits_AccountsClient
 			if ($rejectOnClientError && !in_array ($status, $nullStatuses, true))
 			{
 				$error = json_decode ((string)$response->getBody (), true);
-				$text = is_array ($error) && isset ($error['error']) && is_string ($error['error']) ? $error['error'] : '';
+				$text = '';
+				if (is_array ($error) && isset ($error['error']))
+				{
+					// Accounts answers {"error": {"message": "..."}}; accept a plain string too.
+					$text = is_string ($error['error']) ? $error['error']
+						: (is_array ($error['error']) && isset ($error['error']['message']) && is_string ($error['error']['message']) ? $error['error']['message'] : '');
+				}
 				throw new Neuron_GameServer_Credits_AccountsRejected ($status, $text !== '' ? 'Accounts rejected the request (HTTP ' . $status . '): ' . $text : '');
 			}
 			return null;

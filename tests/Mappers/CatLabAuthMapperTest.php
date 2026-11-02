@@ -73,6 +73,53 @@ class CatLabAuthMapperTest extends TestCase
 		$this->assertSame ('openid credits', $row['scope']);
 	}
 
+	public function testFailedProfileLookupKeepsKnownProfile (): void
+	{
+		$mapper = Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance ();
+		$db = Neuron_DB_Database::getInstance ();
+		$db->query ("INSERT INTO n_auth_openid SET openid_url = '" . self::URL . "', user_id = 880001");
+
+		$mapper->save (self::URL, 34, 'one', 'openid credits');
+		$mapper->save (self::URL, null, 'two', 'openid credits');
+
+		$row = $mapper->getForPlayer ($this->player (880001));
+		$this->assertSame (34, $row['profile_id']);
+		$this->assertSame ('two', $row['access_token']);
+	}
+
+	private function profileClient ($profile): Neuron_GameServer_Credits_AccountsClient
+	{
+		return new class ($profile) extends Neuron_GameServer_Credits_AccountsClient {
+			private $profile;
+			public function __construct ($profile) { $this->profile = $profile; }
+			public function getPersonalProfileId (string $accessToken): ?int
+			{
+				if ($this->profile instanceof Throwable) { throw $this->profile; }
+				return $this->profile;
+			}
+		};
+	}
+
+	public function testRememberLoginOnlyWhenCreditsConfigured (): void
+	{
+		$mapper = Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance ();
+		$db = Neuron_DB_Database::getInstance ();
+		$db->query ("INSERT INTO n_auth_openid SET openid_url = '" . self::URL . "', user_id = 880001");
+
+		$mapper->rememberLogin (null, self::URL, 'tok', 'openid');
+		$this->assertNull ($mapper->getForPlayer ($this->player (880001)));
+
+		$mapper->rememberLogin ($this->profileClient (77), self::URL, 'tok', 'openid credits');
+		$this->assertSame (77, $mapper->getForPlayer ($this->player (880001))['profile_id']);
+
+		$prev = ini_set ('error_log', '/dev/null');
+		$mapper->rememberLogin ($this->profileClient (new Neuron_GameServer_Credits_AccountsUnavailable ('down')), self::URL, 'tok2', 'openid credits');
+		ini_set ('error_log', $prev);
+		$row = $mapper->getForPlayer ($this->player (880001));
+		$this->assertSame (77, $row['profile_id']);
+		$this->assertSame ('tok2', $row['access_token']);
+	}
+
 	public function testIgnoresLegacyUrlsAndRowsWithoutToken (): void
 	{
 		$db = Neuron_DB_Database::getInstance ();

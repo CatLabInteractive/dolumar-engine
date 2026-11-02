@@ -10,6 +10,8 @@ class FakeCreditsClient extends Neuron_GameServer_Credits_AccountsClient
 	public $getRequestThrows = null;
 	public $createThrows = null;
 	public $refundResult = true;
+	/** @var array queue of outcomes for refundRequest: 'refunded' | 'already_refunded' | Throwable */
+	public $refundOutcomes = [];
 	public $nextId = 5001;
 	public $onGetRequest = null;
 
@@ -36,8 +38,15 @@ class FakeCreditsClient extends Neuron_GameServer_Credits_AccountsClient
 
 	public function refund (int $profileId, int $credits, string $reason, ?int $creditRequestId): bool
 	{
+		throw new LogicException ('Purchases must refund through refundRequest');
+	}
+
+	public function refundRequest (int $profileId, int $credits, string $reason, int $creditRequestId): string
+	{
 		$this->refunds[] = [$profileId, $credits, $creditRequestId];
-		return $this->refundResult;
+		$outcome = array_shift ($this->refundOutcomes) ?? ($this->refundResult ? 'refunded' : new Neuron_GameServer_Credits_AccountsRejected (400, 'no'));
+		if ($outcome instanceof Throwable) { throw $outcome; }
+		return $outcome;
 	}
 }
 
@@ -45,6 +54,7 @@ class PurchaseServiceTest extends TestCase
 {
 	private const PREFIX = 'https://accounts.example.test/users/';
 	private const PLID = 770001;
+	private const OTHER_PLID = 770002;
 	private const PROFILE = 4242;
 
 	private $clock = 1800000000;
@@ -65,7 +75,7 @@ class PurchaseServiceTest extends TestCase
 	private function clean (): void
 	{
 		$db = Neuron_DB_Database::getInstance ();
-		$db->query ("DELETE FROM n_credit_purchases WHERE plid = " . self::PLID);
+		$db->query ("DELETE FROM n_credit_purchases WHERE plid IN (" . self::PLID . ", " . self::OTHER_PLID . ")");
 		$db->query ("DELETE FROM n_auth_catlab WHERE openid_url LIKE '%770001'");
 		$db->query ("DELETE FROM n_auth_openid WHERE openid_url LIKE '%770001'");
 	}
@@ -170,7 +180,9 @@ class PurchaseServiceTest extends TestCase
 	public function testStartRejectedMarksFailed (): void
 	{
 		$this->client->createThrows = new Neuron_GameServer_Credits_AccountsRejected (422, 'x');
-		$this->assertSame ('unavailable', $this->service->start ($this->service_player (), ['action' => 'premium'])['status']);
+		$this->quiet (function () {
+			$this->assertSame ('unavailable', $this->service->start ($this->service_player (), ['action' => 'premium'])['status']);
+		});
 		$rows = $this->service->getPlayerPurchases ($this->service_player ());
 		$this->assertSame ('failed', $rows[0]['status']);
 	}
@@ -194,23 +206,131 @@ class PurchaseServiceTest extends TestCase
 		$this->assertSame (0, $this->useCalls);
 	}
 
-	public function testNotifyWrongAmountIgnored (): void
+	public function testNotifyWrongAmountRefundsWhatWasCharged (): void
 	{
 		$id = $this->started ();
 		$this->accept ($id, 1);
-		$this->assertSame ('ignored', $this->service->handleNotify ($id));
-		$this->assertSame ('pending', $this->rowStatus ($id));
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('refunded', $this->service->handleNotify ($id));
+		});
+		$this->assertSame ('refunded', $this->rowStatus ($id));
 		$this->assertSame (0, $this->useCalls);
-		$this->assertSame ([], $this->client->refunds);
+		$this->assertSame ([[self::PROFILE, 1, $id]], $this->client->refunds);
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		$this->assertCount (1, $this->client->refunds);
 	}
 
-	public function testNotifyWrongProfileIgnored (): void
+	public function testNotifyWrongProfileRefundsChargedProfile (): void
 	{
 		$id = $this->started ();
 		$this->accept ($id, 100, 9999);
-		$this->assertSame ('ignored', $this->service->handleNotify ($id));
-		$this->assertSame ('pending', $this->rowStatus ($id));
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('refunded', $this->service->handleNotify ($id));
+		});
+		$this->assertSame ('refunded', $this->rowStatus ($id));
 		$this->assertSame (0, $this->useCalls);
+		$this->assertSame ([[9999, 100, $id]], $this->client->refunds);
+	}
+
+	public function testStartStoresProfile (): void
+	{
+		$id = $this->started ();
+		$this->assertSame (self::PROFILE, Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()->getByRequestId ($id)['profile_id']);
+	}
+
+	public function testProfileChangeAfterStartStillGrants (): void
+	{
+		// The player re-logs with another linked Accounts login after paying.
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->login (5555);
+		$this->assertSame ('granted', $this->service->handleNotify ($id));
+		$this->assertSame (1, $this->useCalls);
+		$this->assertSame ([], $this->client->refunds);
+	}
+
+	public function testChargedOtherThanStoredProfileIsRefunded (): void
+	{
+		// Even when the player's current profile matches the charge, the row's own profile decides.
+		$id = $this->started ();
+		$this->login (5555);
+		$this->accept ($id, 100, 5555);
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('refunded', $this->service->handleNotify ($id));
+		});
+		$this->assertSame (0, $this->useCalls);
+		$this->assertSame ([[5555, 100, $id]], $this->client->refunds);
+	}
+
+	public function testLegacyRowWithoutProfileUsesCurrentProfile (): void
+	{
+		$id = $this->started ();
+		Neuron_DB_Database::getInstance ()->query ("UPDATE n_credit_purchases SET profile_id = NULL WHERE credit_request_id = " . $id);
+		$this->accept ($id);
+		$this->assertSame ('granted', $this->service->handleNotify ($id));
+		$this->assertSame (1, $this->useCalls);
+	}
+
+	public function testDeletedPlayerIsRefunded (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$service = new Neuron_GameServer_Credits_PurchaseService ($this->client, function () { return $this->clock; }, function () { return null; });
+		$this->assertSame ('refunded', $service->handleNotify ($id));
+		$this->assertSame ([[self::PROFILE, 100, $id]], $this->client->refunds);
+		$this->assertSame ('refunded', $this->rowStatus ($id));
+		$this->assertSame (0, $this->useCalls);
+	}
+
+	public function testAcceptedWithoutChargedProfileFailsOnlyAfterExpiry (): void
+	{
+		$id = $this->started ();
+		$this->client->requests[$id] = ['id' => $id, 'credits' => 100, 'status' => 'ACCEPTED', 'user' => []];
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('ignored', $this->service->handleNotify ($id));
+			$this->assertSame ('pending', $this->rowStatus ($id));
+			$this->clock += 3601;
+			$this->assertSame ('ignored', $this->service->handleNotify ($id));
+		});
+		$this->assertSame ('failed', $this->rowStatus ($id));
+		$this->assertSame ([], $this->client->refunds);
+	}
+
+	public function testDeclinedRequestClosesWithoutPolling (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id, 100, self::PROFILE, 'DECLINED');
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('pending', $this->service->handleNotify ($id));
+		});
+		$this->assertSame ('expired', $this->rowStatus ($id));
+		$this->assertSame (0, $this->useCalls);
+		$this->assertSame ([], $this->client->refunds);
+
+		// Should Accounts still accept it after the purchase expired, it is refunded, never granted.
+		$this->clock += 3601;
+		$this->accept ($id);
+		$this->assertSame ('refunded', $this->service->handleNotify ($id));
+		$this->assertSame (0, $this->useCalls);
+		$this->assertCount (1, $this->client->refunds);
+	}
+
+	public function testStartRevokedTokenAsksLogin (): void
+	{
+		foreach ([401, 403] as $status)
+		{
+			$this->client->createThrows = new Neuron_GameServer_Credits_AccountsRejected ($status, 'x');
+			$this->quiet (function () {
+				$this->assertSame ('login', $this->service->start ($this->service_player (), ['action' => 'premium'])['status']);
+			});
+			$this->assertSame ('failed', $this->service->getPlayerPurchases ($this->service_player ())[0]['status']);
+		}
+	}
+
+	private function quiet (callable $fn): void
+	{
+		$prev = ini_set ('error_log', '/dev/null');
+		try { $fn (); } finally { ini_set ('error_log', $prev); }
 	}
 
 	public function testUnknownRequestIgnored (): void
@@ -248,9 +368,85 @@ class PurchaseServiceTest extends TestCase
 		$this->useResult = false;
 		$this->client->refundResult = false;
 		$prev = ini_set ('error_log', '/dev/null');
-		$this->assertSame ('refunded', $this->service->handleNotify ($id));
+		$this->assertSame ('ignored', $this->service->handleNotify ($id));
 		ini_set ('error_log', $prev);
 		$this->assertSame ('failed', $this->rowStatus ($id));
+		// A definitive refusal is terminal: reconcile does not retry it.
+		$this->assertSame (0, $this->service->reconcileForPlayer ($this->player));
+		$this->assertCount (1, $this->client->refunds);
+	}
+
+	public function testTransientRefundFailureIsRetried (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->useResult = false;
+		$this->client->refundOutcomes = [new Neuron_GameServer_Credits_AccountsUnavailable ('down')];
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('pending', $this->service->handleNotify ($id));
+		});
+		$this->assertSame ('refund_pending', $this->rowStatus ($id));
+
+		// Retry while Accounts is still down: stays pending.
+		$this->client->refundOutcomes = [new Neuron_GameServer_Credits_AccountsUnavailable ('down')];
+		$this->quiet (function () {
+			$this->assertSame (0, $this->service->reconcileForPlayer ($this->player));
+		});
+		$this->assertSame ('refund_pending', $this->rowStatus ($id));
+
+		$this->clock += 10;
+		$this->assertSame (1, $this->service->reconcileForPlayer ($this->player));
+		$this->assertSame ('refunded', $this->rowStatus ($id));
+		$this->assertSame ([[self::PROFILE, 100, $id], [self::PROFILE, 100, $id], [self::PROFILE, 100, $id]], $this->client->refunds);
+		$this->assertSame (0, $this->service->reconcileForPlayer ($this->player));
+		$this->assertCount (3, $this->client->refunds);
+		$this->assertSame (1, $this->useCalls);
+	}
+
+	public function testRetryAfterRefundWentThroughIsDone (): void
+	{
+		// First attempt reached Accounts but the answer was lost; the retry is told it exceeds the purchase.
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->clock += 3601;
+		$this->client->refundOutcomes = [new Neuron_GameServer_Credits_AccountsUnavailable ('timeout'), 'already_refunded'];
+		$this->quiet (function () use ($id) {
+			$this->assertSame ('pending', $this->service->handleNotify ($id));
+			$this->assertSame ('refund_pending', $this->rowStatus ($id));
+			$this->assertSame (1, $this->service->reconcileForPlayer ($this->player));
+		});
+		$this->assertSame ('refunded', $this->rowStatus ($id));
+		$this->assertSame (0, $this->service->reconcileForPlayer ($this->player));
+		$this->assertCount (2, $this->client->refunds);
+		$this->assertSame (0, $this->useCalls);
+	}
+
+	public function testRetryRefundsTheChargeReportedByAccounts (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id, 1, 9999);
+		$this->client->refundOutcomes = [new Neuron_GameServer_Credits_AccountsUnavailable ('down')];
+		$this->quiet (function () use ($id) {
+			$this->service->handleNotify ($id);
+			$this->service->reconcileForPlayer ($this->player);
+		});
+		$this->assertSame ([[9999, 1, $id], [9999, 1, $id]], $this->client->refunds);
+		$this->assertSame ('refunded', $this->rowStatus ($id));
+	}
+
+	public function testRefundPendingWithoutChargeOnAccountsFails (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->useResult = false;
+		$this->client->refundOutcomes = [new Neuron_GameServer_Credits_AccountsUnavailable ('down')];
+		$this->quiet (function () use ($id) {
+			$this->service->handleNotify ($id);
+			unset ($this->client->requests[$id]);
+			$this->assertSame (1, $this->service->reconcileForPlayer ($this->player));
+		});
+		$this->assertSame ('failed', $this->rowStatus ($id));
+		$this->assertCount (1, $this->client->refunds);
 	}
 
 	public function testAccountsDownLeavesPending (): void
@@ -280,7 +476,7 @@ class PurchaseServiceTest extends TestCase
 		$a = $this->started ();
 		$this->accept ($a);
 		$this->clock += 700; // b is now past expiry (3700s), a is not
-		$this->assertSame (2, $this->service->reconcile ());
+		$this->assertSame (2, $this->service->reconcileForPlayer ($this->player));
 		$this->assertSame ('granted', $this->rowStatus ($a));
 		$this->assertSame ('expired', $this->rowStatus ($b));
 		$this->assertSame (1, $this->useCalls);
@@ -302,6 +498,70 @@ class PurchaseServiceTest extends TestCase
 		$this->assertFalse ($this->service->refundPurchase ($pid, 'support'));
 		$this->assertCount (1, $this->client->refunds);
 		$this->assertSame ('refunded', $this->rowStatus ($id));
+	}
+
+	/**
+	 * Buy $n premium purchases, granted, then one that stays pending (never refunded).
+	 * @return int[] request ids of the premium purchases, oldest first
+	 */
+	private function grantedPremium (int $n): array
+	{
+		$ids = [];
+		for ($i = 0; $i < $n; $i ++)
+		{
+			$ids[] = $id = $this->started ();
+			$this->accept ($id);
+			$this->assertSame ('granted', $this->service->handleNotify ($id));
+			$this->clock += 10;
+		}
+		$pending = $this->service->start ($this->player, ['action' => 'premium']);
+		$this->assertSame ('redirect', $pending['status']);
+		return $ids;
+	}
+
+	public function testAdminPremiumRefundsOnlyBlocksLeft (): void
+	{
+		foreach ([[5, 1], [5, 14], [5, 15], [5, 16], [5, 31], [2, 60], [3, 0]] as [$n, $days])
+		{
+			$this->clean ();
+			$this->login (self::PROFILE);
+			$this->client->refunds = [];
+			$ids = $this->grantedPremium ($n);
+
+			$endDate = $this->clock + $days * 86400;
+			$blocks = Neuron_GameServer_Pages_Admin_Premium::blocksLeft ($endDate, $this->clock);
+			$this->assertSame ((int) ceil ($days / 15), $blocks, "$days days");
+
+			$result = $this->service->refundNewestPremium ($this->player, $blocks, 'premium account refund');
+			$expected = min ($n, $blocks);
+			$this->assertSame ($expected, $result['purchases'], "$n purchases, $days days");
+			$this->assertSame ($expected * 100, $result['refunded']);
+			$this->assertSame (0, $result['pending'] + $result['failed']);
+
+			// Exactly the newest ones.
+			$newest = array_slice (array_reverse ($ids), 0, $expected);
+			$this->assertSame ($newest, array_map (function ($r) { return $r[2]; }, $this->client->refunds));
+			foreach ($ids as $id)
+			{
+				$this->assertSame (in_array ($id, $newest, true) ? 'refunded' : 'granted', $this->rowStatus ($id));
+			}
+		}
+	}
+
+	public function testAdminPremiumRefundSkipsOtherActions (): void
+	{
+		$id = $this->started ();
+		$this->accept ($id);
+		$this->service->handleNotify ($id);
+		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+		$other = $mapper->insert (self::PLID, self::PROFILE, 75, 'runes', ['action' => 'buyrunes'], date ('Y-m-d H:i:s', $this->clock), date ('Y-m-d H:i:s', $this->clock + 3600));
+		$mapper->setRequestId ($other, 6002);
+		$mapper->transition ($other, 'pending', 'granted', date ('Y-m-d H:i:s', $this->clock));
+
+		$result = $this->service->refundNewestPremium ($this->player, 2, 'premium account refund');
+		$this->assertSame (1, $result['purchases']);
+		$this->assertSame ([[self::PROFILE, 100, $id]], $this->client->refunds);
+		$this->assertSame ('granted', $this->rowStatus (6002));
 	}
 
 	public function testConcurrentNotifiesGrantOnce (): void
@@ -342,19 +602,35 @@ class PurchaseServiceTest extends TestCase
 		$this->assertSame (1, $this->useCalls);
 	}
 
-	public function testPastExpiryMismatchBecomesFailedAndLeavesQueue (): void
+	public function testReconcileForPlayerLeavesOtherPlayers (): void
 	{
-		$id = $this->started ();
-		$this->accept ($id, 1);
-		$this->assertSame (0, $this->service->reconcile ());
-		$this->assertSame ('pending', $this->rowStatus ($id));
-		$this->clock += 3601;
-		$prev = ini_set ('error_log', '/dev/null');
+		$mine = $this->started ();
+		$this->accept ($mine);
+		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+		$other = $mapper->insert (self::OTHER_PLID, self::PROFILE, 100, 'x', ['action' => 'premium'], date ('Y-m-d H:i:s', $this->clock), date ('Y-m-d H:i:s', $this->clock + 3600));
+		$mapper->setRequestId ($other, 6001);
+		$this->accept (6001);
+		$this->assertSame (1, $this->service->reconcileForPlayer ($this->player));
+		$this->assertSame ('granted', $this->rowStatus ($mine));
+		$this->assertSame ('pending', $this->rowStatus (6001));
+	}
+
+	public function testGlobalReconcile (): void
+	{
+		// reconcile() is global; never let it touch rows that are not this test's.
+		$since = date ('Y-m-d H:i:s', $this->clock - Neuron_GameServer_Credits_PurchaseService::EXPIRED_RETRY_WINDOW);
+		$foreign = array_filter (
+			Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()->getSettleable (1000, $since),
+			function ($row) { return $row['plid'] !== self::PLID; }
+		);
+		if ($foreign)
+		{
+			$this->markTestSkipped ('Database has settleable credit purchases of other players; not running the global reconcile on them.');
+		}
+		$a = $this->started ();
+		$this->accept ($a);
 		$this->assertSame (1, $this->service->reconcile ());
-		ini_set ('error_log', $prev);
-		$this->assertSame ('failed', $this->rowStatus ($id));
-		$this->assertSame (0, $this->service->reconcile ());
-		$this->assertSame ([], $this->client->refunds);
+		$this->assertSame ('granted', $this->rowStatus ($a));
 	}
 
 	public function testNotFoundPastExpiryFails (): void
@@ -374,15 +650,16 @@ class PurchaseServiceTest extends TestCase
 	{
 		$prev = ini_set ('error_log', '/dev/null');
 		$stuck = [];
-		for ($i = 0; $i < 3; $i ++) { $stuck[] = $this->started (); $this->accept ($stuck[$i], 1); $this->clock += 1; }
+		// Unknown to Accounts: ignored until they expire.
+		for ($i = 0; $i < 3; $i ++) { $stuck[] = $this->started (); $this->clock += 1; }
 		$good = $this->started ();
 		$this->accept ($good);
 		// limit 3: the three older stuck rows fill the first batch, then rotate behind.
 		$this->clock += 1;
-		$this->service->reconcile (3);
+		$this->service->reconcileForPlayer ($this->player, 3);
 		$this->assertSame ('pending', $this->rowStatus ($good));
 		$this->clock += 1;
-		$this->assertSame (1, $this->service->reconcile (3));
+		$this->assertSame (1, $this->service->reconcileForPlayer ($this->player, 3));
 		ini_set ('error_log', $prev);
 		$this->assertSame ('granted', $this->rowStatus ($good));
 	}

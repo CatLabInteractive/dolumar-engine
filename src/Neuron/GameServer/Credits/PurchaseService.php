@@ -5,7 +5,14 @@
  *
  * Trust model: the action and price come from our own n_credit_purchases row;
  * a grant additionally requires Accounts (client credentials) to report the
- * request ACCEPTED for the same credits and the player's own profile id.
+ * request ACCEPTED for the same credits and the profile id stored on the row
+ * when the purchase started.
+ *
+ * Money rule: an ACCEPTED (charged) request is either granted once or
+ * refunded to the charged profile (the request's user.id), always with its
+ * credit_request_id so Accounts caps the refund at what was paid. A refund
+ * that cannot reach Accounts is kept as 'refund_pending' and retried by
+ * reconcile; only a definitive refusal ends in 'failed' (logged).
  *
  * Exactly-once: every state change is a compare-and-set UPDATE
  * (see CreditPurchaseMapper::transition). The row is CLAIMED (pending ->
@@ -62,7 +69,7 @@ class Neuron_GameServer_Credits_PurchaseService
 
 		$purchaseId = $mapper->insert
 		(
-			(int) $player->getId (), $credits, $description, $data,
+			(int) $player->getId (), (int) $auth['profile_id'], $credits, $description, $data,
 			$this->format ($now), $this->format ($now + self::TTL)
 		);
 
@@ -78,6 +85,11 @@ class Neuron_GameServer_Credits_PurchaseService
 		{
 			error_log ('Credits: Accounts rejected createRequest for purchase ' . $purchaseId . ' (HTTP ' . $e->getStatus () . ')');
 			$mapper->transition ($purchaseId, 'pending', 'failed', $this->format ($this->now ()));
+			// Revoked token or credits scope not granted: a fresh login fixes it.
+			if (in_array ($e->getStatus (), [401, 403], true))
+			{
+				return ['status' => 'login', 'url' => null];
+			}
 			return ['status' => 'unavailable', 'url' => null];
 		}
 		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
@@ -117,24 +129,53 @@ class Neuron_GameServer_Credits_PurchaseService
 		{
 			return 'ignored';
 		}
-		$result = $this->settle ($purchase, false);
-		// 'expired' / 'failed' are internal outcomes of the reconcile path.
-		return $result === 'expired' ? 'pending' : ($result === 'failed' ? 'ignored' : $result);
+		$result = $this->settle ($purchase);
+		// 'expired' / 'failed' / 'refund_pending' are internal outcomes of the reconcile path.
+		switch ($result)
+		{
+			case 'expired':
+			case 'refund_pending':
+				return 'pending';
+			case 'failed':
+				return 'ignored';
+			default:
+				return $result;
+		}
 	}
 
 	/**
-	 * Settle pending purchases with a request id. Returns how many changed state.
+	 * Settle pending purchases with a request id and retry refunds that could
+	 * not reach Accounts. Returns how many reached a final state.
 	 */
 	public function reconcile (int $limit = 50): int
 	{
-		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
-		$rows = $mapper->getSettleable ($limit, $this->format ($this->now () - self::EXPIRED_RETRY_WINDOW));
+		return $this->reconcileRows
+		(
+			Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()
+				->getSettleable ($limit, $this->format ($this->now () - self::EXPIRED_RETRY_WINDOW))
+		);
+	}
 
+	/**
+	 * Same as reconcile(), limited to one player's purchases.
+	 */
+	public function reconcileForPlayer (Neuron_GameServer_Player $player, int $limit = 10): int
+	{
+		return $this->reconcileRows
+		(
+			Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()
+				->getSettleable ($limit, $this->format ($this->now () - self::EXPIRED_RETRY_WINDOW), (int) $player->getId ())
+		);
+	}
+
+	private function reconcileRows (array $rows): int
+	{
+		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
 		$settled = 0;
 		foreach ($rows as $row)
 		{
 			$mapper->touch ($row['id'], $this->format ($this->now ()));
-			$result = $this->settle ($row, true);
+			$result = $this->settle ($row);
 			if (in_array ($result, ['granted', 'refunded', 'expired', 'failed'], true))
 			{
 				$settled ++;
@@ -144,29 +185,52 @@ class Neuron_GameServer_Credits_PurchaseService
 	}
 
 	/**
-	 * Admin tool: refund a granted purchase. Claims granted -> refunded first.
+	 * Admin tool: refund a granted purchase. True when the refund was issued
+	 * or is queued for retry (refund_pending).
 	 */
 	public function refundPurchase (int $purchaseId, string $reason): bool
 	{
-		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
-		$purchase = $mapper->get ($purchaseId);
-		if ($purchase === null || $purchase['credit_request_id'] === null || $purchase['status'] !== 'granted')
+		$status = $this->refundGranted ($purchaseId, $reason);
+		return $status === 'refunded' || $status === 'refund_pending';
+	}
+
+	/**
+	 * Admin premium refund: refund the newest $blocks granted premium purchases
+	 * of this player (one purchase = one block of premium days).
+	 *
+	 * @return array{refunded:int, pending:int, failed:int, purchases:int} credits per outcome, purchases touched
+	 */
+	public function refundNewestPremium (Neuron_GameServer_Player $player, int $blocks, string $reason): array
+	{
+		$out = ['refunded' => 0, 'pending' => 0, 'failed' => 0, 'purchases' => 0];
+		if ($blocks < 1)
 		{
-			return false;
+			return $out;
 		}
 
-		$profileId = $this->profileIdOf ($purchase);
-		if ($profileId === null)
+		// getPlayerPurchases is newest first.
+		foreach ($this->getPlayerPurchases ($player) as $purchase)
 		{
-			return false;
-		}
+			$action = $purchase['action_data']['action'] ?? '';
+			if ($purchase['status'] !== 'granted' || ($action !== '' && $action !== 'premium'))
+			{
+				continue;
+			}
 
-		if (!$mapper->transition ($purchase['id'], 'granted', 'refunded', $this->format ($this->now ())))
-		{
-			return false;
-		}
+			$status = $this->refundGranted ($purchase['id'], $reason);
+			if ($status !== null)
+			{
+				$out['purchases'] ++;
+				$key = $status === 'refund_pending' ? 'pending' : ($status === 'refunded' ? 'refunded' : 'failed');
+				$out[$key] += $purchase['credits'];
+			}
 
-		return $this->issueRefund ($purchase, $profileId, $reason);
+			if ($out['purchases'] >= $blocks)
+			{
+				break;
+			}
+		}
+		return $out;
 	}
 
 	public function getPlayerPurchases (Neuron_GameServer_Player $player): array
@@ -174,9 +238,43 @@ class Neuron_GameServer_Credits_PurchaseService
 		return Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ()->getForPlayer ((int) $player->getId ());
 	}
 
-	private function settle (array $purchase, bool $fromReconcile): string
+	/**
+	 * Claim granted -> refunded first, then refund the profile charged at start.
+	 *
+	 * @return string|null refunded|refund_pending|failed, null when not refundable
+	 */
+	private function refundGranted (int $purchaseId, string $reason): ?string
 	{
 		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+		$purchase = $mapper->get ($purchaseId);
+		if ($purchase === null || $purchase['credit_request_id'] === null || $purchase['status'] !== 'granted')
+		{
+			return null;
+		}
+
+		// A granted row was charged to its stored profile (legacy rows: the current one).
+		$profileId = $purchase['profile_id'] ?? $this->currentProfileIdOf ($purchase);
+		if ($profileId === null)
+		{
+			return null;
+		}
+
+		if (!$mapper->transition ($purchase['id'], 'granted', 'refunded', $this->format ($this->now ())))
+		{
+			return null;
+		}
+
+		return $this->issueRefund ($purchase, $profileId, $purchase['credits'], $reason);
+	}
+
+	private function settle (array $purchase): string
+	{
+		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+
+		if ($purchase['status'] === 'refund_pending')
+		{
+			return $this->retryRefund ($purchase);
+		}
 
 		// 'expired' rows stay settleable: a late confirmation gets refunded.
 		if ($purchase['status'] !== 'pending' && $purchase['status'] !== 'expired')
@@ -184,21 +282,10 @@ class Neuron_GameServer_Credits_PurchaseService
 			return 'ignored';
 		}
 		$from = $purchase['status'];
-		$requestId = (int) $purchase['credit_request_id'];
 
-		try
+		$request = $this->fetchRequest ($purchase);
+		if ($request === false)
 		{
-			$request = $this->client->getRequest ($requestId);
-		}
-		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
-		{
-			return 'pending';
-		}
-		catch (Neuron_GameServer_Credits_AccountsRejected $e)
-		{
-			// Likely a bad client secret: leave the row alone, shout, never grant or refund.
-			error_log ('Credits: Accounts rejected getRequest ' . $requestId . ' (HTTP ' . $e->getStatus () . ')');
-			$mapper->touch ($purchase['id'], $this->format ($this->now ()));
 			return 'pending';
 		}
 
@@ -207,33 +294,55 @@ class Neuron_GameServer_Credits_PurchaseService
 			return $this->unsettleable ($purchase, $from, 'request not found on Accounts');
 		}
 
-		if (strtoupper ((string) ($request['status'] ?? '')) !== 'ACCEPTED')
+		$status = strtoupper ((string) ($request['status'] ?? ''));
+		if ($status !== 'ACCEPTED')
 		{
-			if ($from === 'pending' && $this->isExpired ($purchase)
+			// No status at all is treated like PENDING.
+			$final = $status !== 'PENDING' && $status !== '';
+			if ($from === 'pending' && ($final || $this->isExpired ($purchase))
 				&& $mapper->transition ($purchase['id'], 'pending', 'expired', $this->format ($this->now ())))
 			{
+				if ($final)
+				{
+					// A final status that is not a charge (Accounts has none today). The row
+					// stays settleable as 'expired' for a while, so a later ACCEPTED is refunded.
+					error_log ('Credits: purchase ' . $purchase['id'] . ' request ' . $purchase['credit_request_id'] . ' has status ' . $status . ': not charged, closed');
+				}
 				return 'expired';
 			}
 			return 'pending';
 		}
 
-		$profileId = $this->profileIdOf ($purchase);
-		$requestProfileId = isset ($request['user']['id']) ? (int) $request['user']['id'] : 0;
-
-		if ((int) ($request['credits'] ?? -1) !== $purchase['credits'] || $profileId === null || $requestProfileId !== $profileId)
+		// ACCEPTED: the player was charged. From here on, grant or refund.
+		$chargedProfile = isset ($request['user']['id']) ? (int) $request['user']['id'] : 0;
+		$chargedCredits = (int) ($request['credits'] ?? 0);
+		if ($chargedProfile <= 0 || $chargedCredits <= 0)
 		{
-			return $this->unsettleable ($purchase, $from, 'accepted request does not match purchase credits/profile');
+			return $this->unsettleable ($purchase, $from, 'accepted request without a charged profile or credits');
+		}
+
+		if ($chargedCredits !== $purchase['credits'])
+		{
+			error_log ('Credits: purchase ' . $purchase['id'] . ' request ' . $purchase['credit_request_id'] . ' charged ' . $chargedCredits . ' credits, expected ' . $purchase['credits'] . ': refunding');
+			return $this->claimAndRefund ($purchase, $from, $chargedProfile, $chargedCredits, 'Purchase could not be applied');
+		}
+
+		$expectedProfile = $purchase['profile_id'] ?? $this->currentProfileIdOf ($purchase);
+		if ($expectedProfile === null || $chargedProfile !== $expectedProfile)
+		{
+			error_log ('Credits: purchase ' . $purchase['id'] . ' request ' . $purchase['credit_request_id'] . ' charged profile ' . $chargedProfile . ', expected ' . ($expectedProfile ?? 'none') . ': refunding');
+			return $this->claimAndRefund ($purchase, $from, $chargedProfile, $chargedCredits, 'Purchase could not be applied');
 		}
 
 		if ($this->isExpired ($purchase))
 		{
-			return $this->claimAndRefund ($purchase, $from, $profileId, 'Purchase expired');
+			return $this->claimAndRefund ($purchase, $from, $chargedProfile, $chargedCredits, 'Purchase expired');
 		}
 
 		$player = ($this->playerLoader) ((int) $purchase['plid']);
 		if (!$player)
 		{
-			return $this->claimAndRefund ($purchase, $from, $profileId, 'Player not found');
+			return $this->claimAndRefund ($purchase, $from, $chargedProfile, $chargedCredits, 'Player not found');
 		}
 
 		// Claim BEFORE useCredit: only the caller whose UPDATE changed the row may apply it.
@@ -262,13 +371,70 @@ class Neuron_GameServer_Credits_PurchaseService
 		{
 			return 'ignored';
 		}
-		$this->issueRefund ($purchase, $profileId, 'Action could not be applied');
-		return 'refunded';
+		return $this->issueRefund ($purchase, $chargedProfile, $chargedCredits, 'Action could not be applied');
 	}
 
 	/**
-	 * A row that cannot be matched to its request: ignore while the purchase
+	 * Retry a refund that could not reach Accounts. The charged profile and
+	 * amount come from Accounts itself, so a retry refunds exactly the charge.
+	 */
+	private function retryRefund (array $purchase): string
+	{
+		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+
+		$request = $this->fetchRequest ($purchase);
+		if ($request === false)
+		{
+			return 'refund_pending';
+		}
+
+		$chargedProfile = isset ($request['user']['id']) ? (int) $request['user']['id'] : 0;
+		$chargedCredits = (int) ($request['credits'] ?? 0);
+		if ($request === null || strtoupper ((string) ($request['status'] ?? '')) !== 'ACCEPTED' || $chargedProfile <= 0 || $chargedCredits <= 0)
+		{
+			if ($mapper->transition ($purchase['id'], 'refund_pending', 'failed', $this->format ($this->now ())))
+			{
+				error_log ('Credits: REFUND FAILED for purchase ' . $purchase['id'] . ' (request ' . $purchase['credit_request_id'] . '): Accounts no longer reports an accepted charge; marked failed, manual action needed');
+				return 'failed';
+			}
+			return 'ignored';
+		}
+
+		if (!$mapper->transition ($purchase['id'], 'refund_pending', 'refunded', $this->format ($this->now ())))
+		{
+			return 'ignored';
+		}
+
+		return $this->issueRefund ($purchase, $chargedProfile, $chargedCredits, 'Refund: ' . $purchase['description']);
+	}
+
+	/**
+	 * @return array|null|false the request, null when Accounts does not know it,
+	 *                          false when it cannot be asked right now
+	 */
+	private function fetchRequest (array $purchase)
+	{
+		$requestId = (int) $purchase['credit_request_id'];
+		try
+		{
+			return $this->client->getRequest ($requestId);
+		}
+		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
+		{
+			return false;
+		}
+		catch (Neuron_GameServer_Credits_AccountsRejected $e)
+		{
+			// Likely a bad client secret: leave the row alone, shout, never grant or refund.
+			error_log ('Credits: Accounts rejected getRequest ' . $requestId . ' (HTTP ' . $e->getStatus () . ')');
+			return false;
+		}
+	}
+
+	/**
+	 * A row that cannot be matched to a charge: ignore while the purchase
 	 * is live, fail it for good once past expiry so it cannot clog reconcile.
+	 * Only used when Accounts reports no charge we could refund.
 	 */
 	private function unsettleable (array $purchase, string $from, string $reason): string
 	{
@@ -282,44 +448,57 @@ class Neuron_GameServer_Credits_PurchaseService
 		return 'ignored';
 	}
 
-	private function claimAndRefund (array $purchase, string $from, int $profileId, string $reason): string
+	private function claimAndRefund (array $purchase, string $from, int $profileId, int $credits, string $reason): string
 	{
 		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
 		if (!$mapper->transition ($purchase['id'], $from, 'refunded', $this->format ($this->now ())))
 		{
 			return 'ignored';
 		}
-		$this->issueRefund ($purchase, $profileId, $reason);
-		return 'refunded';
+		return $this->issueRefund ($purchase, $profileId, $credits, $reason);
 	}
 
 	/**
-	 * Row is already claimed as 'refunded'. If Accounts refuses or is down,
-	 * mark it 'failed' and log so an admin can act; a refund we could not
-	 * issue must be visible, not silently retried.
+	 * Row is already claimed as 'refunded'. Accounts unreachable (network or
+	 * 5xx): 'refund_pending', retried by reconcile. Accounts refuses (4xx):
+	 * 'failed' and logged for an admin. "Exceeds the purchase" means an
+	 * earlier attempt already went through: done.
+	 *
+	 * @return string refunded|refund_pending|failed
 	 */
-	private function issueRefund (array $purchase, int $profileId, string $reason): bool
+	private function issueRefund (array $purchase, int $profileId, int $credits, string $reason): string
 	{
 		$mapper = Neuron_GameServer_Mappers_CreditPurchaseMapper::getInstance ();
+		$what = 'purchase ' . $purchase['id'] . ' (request ' . $purchase['credit_request_id'] . ', ' . $credits . ' credits, profile ' . $profileId . ')';
 
 		try
 		{
-			$ok = $this->client->refund ($profileId, $purchase['credits'], $reason, $purchase['credit_request_id']);
+			$result = $this->client->refundRequest ($profileId, $credits, $reason, (int) $purchase['credit_request_id']);
+			if ($result === 'already_refunded')
+			{
+				error_log ('Credits: refund for ' . $what . ': Accounts reports it already refunded, treating as done');
+			}
+			return 'refunded';
 		}
-		catch (Neuron_GameServer_Credits_AccountsUnavailable | Neuron_GameServer_Credits_AccountsRejected $e)
+		catch (Neuron_GameServer_Credits_AccountsUnavailable $e)
 		{
-			$ok = false;
+			error_log ('Credits: refund for ' . $what . ' could not reach Accounts; will retry');
+			$mapper->transition ($purchase['id'], 'refunded', 'refund_pending', $this->format ($this->now ()));
+			return 'refund_pending';
 		}
-
-		if (!$ok)
+		catch (Neuron_GameServer_Credits_AccountsRejected $e)
 		{
-			error_log ('Credits: REFUND FAILED for purchase ' . $purchase['id'] . ' (request ' . $purchase['credit_request_id'] . ', ' . $purchase['credits'] . ' credits, profile ' . $profileId . '): manual action needed');
+			error_log ('Credits: REFUND FAILED for ' . $what . ': ' . $e->getMessage () . '; marked failed, manual action needed');
 			$mapper->transition ($purchase['id'], 'refunded', 'failed', $this->format ($this->now ()));
+			return 'failed';
 		}
-		return $ok;
 	}
 
-	private function profileIdOf (array $purchase): ?int
+	/**
+	 * The player's current Accounts profile. Only for rows created before
+	 * profile_id was stored on the purchase.
+	 */
+	private function currentProfileIdOf (array $purchase): ?int
 	{
 		$player = ($this->playerLoader) ((int) $purchase['plid']);
 		if (!$player)
