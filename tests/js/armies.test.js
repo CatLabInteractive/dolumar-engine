@@ -82,3 +82,11 @@ test('eta formats the remaining seconds of the last path as h:mm', () => {
 	assert.strictEqual(a.eta(obj, 1199), '0:00');
 	assert.strictEqual(a.eta({ paths: [{ start: 0, end: 7260, points: [[0,0],[1,1]] }] }, 0), '2:01');
 });
+
+test('loadText takes the kind texts from CONFIG_ARMY_TEXT when the game defines it', () => {
+	const a = load();
+	assert.deepStrictEqual(Object.assign({}, a.kindText), {});
+	a.loadText({ attack: 'Attacking army', open: 'Open' });
+	assert.strictEqual(a.kindText.attack, 'Attacking army');
+	assert.strictEqual(a.kindText.open, 'Open');
+});

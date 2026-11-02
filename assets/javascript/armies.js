@@ -50,8 +50,22 @@ Game.armies =
 		layer.appendChild (canvas);
 		Game.armies.canvas = canvas;
 
+		if (typeof (CONFIG_ARMY_TEXT) != 'undefined')
+		{
+			Game.armies.loadText (CONFIG_ARMY_TEXT);
+		}
+
 		Game.armies.tickTimer = setInterval (Game.armies.tick, 1000);
 		Game.armies.setPollInterval (Game.armies.DEFAULT_POLL);
+	},
+
+	/* Translated texts per kind (plus 'open'), emitted by the game's header template */
+	'loadText' : function (texts)
+	{
+		for (var k in texts)
+		{
+			Game.armies.kindText[k] = texts[k];
+		}
 	},
 
 	'setPollInterval' : function (seconds)
