@@ -357,6 +357,95 @@ Game.map =
 		);
 		
 		Game.map.oScrollMap.enableControls ();
+
+		// Map scale: pinch is a mobile-layout feature; a pinch stores its result.
+		Game.map.oScrollMap.canPinch = function ()
+		{
+			return Game.layout.mode () === 'mobile';
+		};
+
+		Game.map.oScrollMap.onscale = function (s)
+		{
+			Game.map.setScale (s);
+		};
+
+		Game.map.applyStoredScale ();
+
+		// The desktop layout always shows the map at scale 1.
+		Game.layout.onChange (function ()
+		{
+			Game.map.applyStoredScale ();
+		});
+	},
+
+	/* Map scale (mobile layout) */
+
+	'SCALE_STEP' : 0.25,
+	'SCALE_STORAGE_KEY' : 'dolumar.mapScale',
+
+	// Set the map scale and remember it in this browser.
+	'setScale' : function (s)
+	{
+		if (Game.map.oScrollMap == null)
+		{
+			return;
+		}
+
+		Game.map.oScrollMap.setScale (s);
+
+		try
+		{
+			window.localStorage.setItem (Game.map.SCALE_STORAGE_KEY, String (Game.map.oScrollMap.getScale ()));
+		}
+		catch (e) {}
+	},
+
+	'zoomIn' : function ()
+	{
+		if (Game.map.oScrollMap != null)
+		{
+			Game.map.setScale (Game.map.oScrollMap.getScale () + Game.map.SCALE_STEP);
+		}
+	},
+
+	'zoomOut' : function ()
+	{
+		if (Game.map.oScrollMap != null)
+		{
+			Game.map.setScale (Game.map.oScrollMap.getScale () - Game.map.SCALE_STEP);
+		}
+	},
+
+	// Mobile layout: use the stored scale. Desktop layout: scale 1 (only reset if it was changed).
+	'applyStoredScale' : function ()
+	{
+		var viewer = Game.map.oScrollMap;
+		if (viewer == null)
+		{
+			return;
+		}
+
+		if (Game.layout.mode () !== 'mobile')
+		{
+			if (viewer.getScale () !== 1)
+			{
+				viewer.setScale (1);
+			}
+			return;
+		}
+
+		var stored = null;
+		try
+		{
+			stored = window.localStorage.getItem (Game.map.SCALE_STORAGE_KEY);
+		}
+		catch (e) {}
+
+		var s = parseFloat (stored);
+		if (!isNaN (s) && s !== viewer.getScale ())
+		{
+			viewer.setScale (s);
+		}
 	},
 	
 	/* Region drawing */
