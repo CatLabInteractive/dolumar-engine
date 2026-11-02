@@ -122,6 +122,12 @@ Game.gui =
 		
 		// Close key
 		WindowCloseKey.init();
+
+		// Move open windows between Prototype windows and sheets when the layout mode changes.
+		if (Game.layout && Game.layout.onChange)
+		{
+			Game.layout.onChange (Game.gui.relayoutWindows);
+		}
 		
 		// Call "initialize" tracker
 		Game.gui.trackIt ('loading');
@@ -978,10 +984,12 @@ Game.gui =
 
 		var div;
 		var completeWindow;
+		var settings = null;
+		var oSheet = null;
 	
 		if (oWindowXML.attributes.getNamedItem('type').value == 'window')
 		{
-			var settings = {
+			settings = {
 				className:	Game.gui.sGuiTheme, 
 				title: 		title, 
 				width: 		parseInt(width),
@@ -1012,15 +1020,32 @@ Game.gui =
 			if (left != null) settings.left = left;
 			if (top != null) settings.top = top;
 		
-			win = new Window (settings);
-			
-			div = $(win.getContent ());
-			completeWindow = $(win.element);
-
-			if (className != null)
+			if (Game.layout.mode() === 'mobile')
 			{
-				completeWindow.addClassName(className);
-				win._getWindowBorderSize ();
+				oSheet = Game.sheets.open ({
+					dialogId :	sDialogId,
+					title :		title,
+					closable :	isClosable,
+					modal :		modal,
+					className :	className
+				});
+
+				win = null;
+				div = oSheet.content;
+				completeWindow = oSheet.element;
+			}
+			else
+			{
+				win = new Window (settings);
+				
+				div = $(win.getContent ());
+				completeWindow = $(win.element);
+
+				if (className != null)
+				{
+					completeWindow.addClassName(className);
+					win._getWindowBorderSize ();
+				}
 			}
 
 
@@ -1084,6 +1109,11 @@ Game.gui =
 			'sRequestData' : sRequestData,
 			'sRequestDataText' : Object.toJSON(sRequestData),
 			'oWindow' : win,
+			'oSheet' : oSheet,
+			'settings' : settings,
+			'className' : className,
+			'modal' : modal,
+			'center' : center,
 			'sInputData' : '{}',
 			'iPollInterval' : iPollInterval,
 			'sPool' : sPool
@@ -1133,6 +1163,122 @@ Game.gui =
 		fOnLoad ();
 	},
 	
+	/*
+		Called when the layout mode changes: turn every open window into a
+		sheet (mode 'mobile') or every sheet back into a Prototype window
+		(mode 'desktop'). The window entries themselves stay in
+		aOpenWindows with the same dialog ids, so polling is unaffected.
+		Panels and invisible windows (no oWindow, no oSheet) are left alone.
+	*/
+	'relayoutWindows' : function (mode)
+	{
+		var windows = Game.gui.aOpenWindows;
+
+		for (var i = 0; i < windows.length; i ++)
+		{
+			var entry = windows[i];
+
+			if (mode == 'mobile' && entry.oWindow)
+			{
+				Game.gui.windowToSheet (entry);
+			}
+			else if (mode == 'desktop' && entry.oSheet)
+			{
+				Game.gui.sheetToWindow (entry);
+			}
+		}
+
+		if (Game.gui.oDialog)
+		{
+			Game.gui.oDialog.toFront ();
+		}
+	},
+
+	/*
+		Move the children of the entry's content element into a new content
+		element, which then becomes entry.div (with the marks that
+		getWindowFromElement and the window CSS need).
+	*/
+	'moveWindowContent' : function (entry, target)
+	{
+		target = $(target);
+
+		while (entry.div.firstChild)
+		{
+			target.appendChild (entry.div.firstChild);
+		}
+
+		target.dialogId = entry.sDialogId;
+		target.addClassName ('guiwindow');
+
+		if (entry.className)
+		{
+			target.addClassName (entry.className);
+		}
+
+		entry.div = target;
+	},
+
+	'windowToSheet' : function (entry)
+	{
+		var win = entry.oWindow;
+
+		var sheet = Game.sheets.open ({
+			dialogId :	entry.sDialogId,
+			title :		entry.settings.title,
+			closable :	entry.settings.closable,
+			modal :		entry.modal,
+			className :	entry.className
+		});
+
+		Game.gui.moveWindowContent (entry, sheet.content);
+
+		// Destroy the window without forgetting the entry.
+		win.options.onDestroy = null;
+		if (win.modal)
+		{
+			// Drop the modal overlay; destroy () alone leaves it behind.
+			win.doNotNotifyHide = true;
+			win.hide ();
+		}
+		win.destroy ();
+
+		entry.oWindow = null;
+		entry.oSheet = sheet;
+	},
+
+	'sheetToWindow' : function (entry)
+	{
+		var win = new Window (entry.settings);
+
+		if (entry.className)
+		{
+			$(win.element).addClassName (entry.className);
+			win._getWindowBorderSize ();
+		}
+
+		Game.gui.moveWindowContent (entry, win.getContent ());
+
+		// Remove the sheet without calling destroyWindow.
+		Game.sheets.close (entry.oSheet);
+
+		entry.oSheet = null;
+		entry.oWindow = win;
+
+		win.setConstraint (true, {top: 31, bottom: 0, left: 0, right: 0});
+
+		if (entry.center)
+		{
+			win.showCenter (entry.modal);
+		}
+		else
+		{
+			win.show (entry.modal);
+		}
+
+		win.toFront ();
+	},
+
 	'destroyWindow' : function (dialog, isTrigger)
 	{
 		if (typeof (dialog) == 'string')
@@ -1152,7 +1298,16 @@ Game.gui =
 		}
 		else
 		{
-			if (dialog.oWindow == null)
+			if (dialog.oSheet)
+			{
+				// A sheet has no Window to destroy: remove the sheet (back and
+				// close already did that before calling us as a trigger).
+				if (!isTrigger)
+				{
+					Game.sheets.close (dialog.oSheet);
+				}
+			}
+			else if (dialog.oWindow == null)
 			{
 				try
 				{
@@ -1215,11 +1370,26 @@ Game.gui =
 				)
 			)
 			{
-				Game.gui.aOpenWindows[i].oWindow.toFront();
+				Game.gui.focusWindow (Game.gui.aOpenWindows[i]);
 				return true;
 			}
 		}
 		return false;
+	},
+	
+	/*
+		Bring an open window to the front: a Window on desktop, a sheet in mobile mode.
+	*/
+	'focusWindow' : function (entry)
+	{
+		if (entry.oWindow)
+		{
+			entry.oWindow.toFront();
+		}
+		else if (entry.oSheet)
+		{
+			Game.sheets.focus (entry.oSheet);
+		}
 	},
 	
 	/*
@@ -1356,6 +1526,12 @@ Game.gui =
 		{
 			var fActionTwo = sActionTwo;
 		}
+		
+		if (Game.layout.mode() === 'mobile')
+		{
+			Game.gui.sheetMessage (sText, sLabelOne, fActionOne, sLabelTwo, fActionTwo);
+			return;
+		}
 	
 		Dialog.confirm 
 		(
@@ -1371,6 +1547,44 @@ Game.gui =
 				cancelLabel : sLabelTwo
 			}
 		);
+	},
+	
+	/*
+		Mobile mode replacement for Dialog.confirm: a modal sheet with the
+		text and two buttons. Either button closes the modal after its action.
+	*/
+	'sheetMessage' : function (sText, sLabelOne, fActionOne, sLabelTwo, fActionTwo)
+	{
+		var oSheet = Game.sheets.open ({
+			title :		'',
+			closable :	false,
+			modal :		true,
+			className :	'sheet-dialog'
+		});
+		
+		var message = new Element ('p', { 'class' : 'alert sheet-message' });
+		message.update (sText);
+		
+		var actions = new Element ('div', { 'class' : 'sheet-actions' });
+		
+		var addButton = function (sLabel, fAction)
+		{
+			var button = new Element ('button', { 'type' : 'button' });
+			button.update (sLabel);
+			button.observe ('click', function (event)
+			{
+				Event.stop (event);
+				Game.sheets.close (oSheet);
+				fAction ();
+			});
+			actions.appendChild (button);
+		};
+		
+		addButton (sLabelOne, fActionOne);
+		addButton (sLabelTwo, fActionTwo);
+		
+		oSheet.content.appendChild (message);
+		oSheet.content.appendChild (actions);
 	},
 	
 	'confirmAction' : function (sText)
@@ -1496,6 +1710,8 @@ Game.gui =
 				win.oWindow.element.style.display = 'none';
 			}
 		}
+		
+		Game.sheets.hideAll ();
 	},
 	
 	'showAllWindows' : function ()
@@ -1508,6 +1724,8 @@ Game.gui =
 				win.oWindow.element.style.display = 'block';
 			}
 		}	
+		
+		Game.sheets.showAll ();
 	},
 	
 	/*

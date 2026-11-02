@@ -108,6 +108,8 @@ Game.core =
 
 	'initialize' : function ()
 	{
+		Game.layout.init ();
+
 		// Fix the IE6 cache bug
 		try
 		{

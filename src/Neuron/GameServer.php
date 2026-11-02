@@ -29,6 +29,28 @@ class Neuron_GameServer
 
 	const SCRIPT_PATH = __DIR__ . '/GameServer/scripts/';
 
+	public const LAYOUT_VALUES = ['auto', 'desktop', 'mobile'];
+	public const LAYOUT_DEFAULT = 'desktop';
+
+	/**
+	 * Decide which UI layout the shell uses. A valid query value wins,
+	 * then a valid stored preference, else the default.
+	 */
+	public static function resolveLayoutPreference (?string $stored, ?string $query): string
+	{
+		if ($query !== null && in_array ($query, self::LAYOUT_VALUES, true))
+		{
+			return $query;
+		}
+
+		if ($stored !== null && in_array ($stored, self::LAYOUT_VALUES, true))
+		{
+			return $stored;
+		}
+
+		return self::LAYOUT_DEFAULT;
+	}
+
 	/**
 	 * Map a /test/<name> request to a script inside SCRIPT_PATH.'tests/'.
 	 * Returns the absolute path, or null when the name is not acceptable.
@@ -838,6 +860,11 @@ class Neuron_GameServer
 		{
 			$page->set ('premium', false);
 		}
+
+		// Layout (desktop / mobile / auto)
+		$stored = $player ? $player->getPreference ('layout', null) : null;
+		$query = isset ($_GET['layout']) && is_string ($_GET['layout']) ? $_GET['layout'] : null;
+		$page->set ('layout', self::resolveLayoutPreference (is_string ($stored) ? $stored : null, $query));
 
 		echo $page->parse ('gameserver/index.phpt');
 	}

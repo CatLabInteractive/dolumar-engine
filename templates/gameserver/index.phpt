@@ -15,6 +15,8 @@
 	<head>
 	
 		<title>Dolumar <?=$name?></title>
+
+		<meta name="viewport" id="viewport" content="width=device-width, initial-scale=1" />
 		
 		<!-- JAVASCRIPT -->		
 		<script type="text/javascript">
@@ -47,6 +49,7 @@
 			var CONFIG_ENV_SERVERNAME = '<?=str_replace (' ', '_', Neuron_GameServer_Server::getInstance()->getServerName ()); ?>';
 			var CONFIG_ENV_CONTAINER = '<?=isset($_SESSION['opensocial_container'])?$_SESSION['opensocial_container'] : 'none'; ?>';
 			var CONFIG_THEME = 'nuncio';
+			var CONFIG_LAYOUT = '<?=htmlspecialchars ($layout)?>';
 			var CONFIG_MAP_TILESIZE = <?=$map_tile_size?>;
 			
 			<?php if (defined ('GOOGLE_ANALYTICS')) { ?>
@@ -104,7 +107,9 @@
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/scrollmap.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/minimap.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/gamemap.js?version=<?=$application_version?>"></script>
+		<script type="text/javascript" src="<?=$static_client_url?>javascript/layout.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/gui.js?version=<?=$application_version?>"></script>
+		<script type="text/javascript" src="<?=$static_client_url?>javascript/sheets.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/game.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/functions.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/forum.js?version=<?=$application_version?>"></script>
@@ -122,6 +127,7 @@
 		<link href="<?=$static_client_url?>css/main.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
 		<link href="<?=$static_client_url?>css/forms.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
 		<link href="<?=$static_client_url?>css/windows.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
+		<link href="<?=$static_client_url?>css/sheets.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
 
 		<link href="<?=$static_client_url?>css/forum.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
 		<link href="<?=$static_client_url?>javascript/lightbox/lightbox.css?version=<?=$application_version?>" rel="stylesheet" type="text/css" />
@@ -170,6 +176,8 @@
 		<!-- /plugin for body -->
 	
 		<div id="bodyDiv" style="width: 100%; height: 100%;">
+			<div id="sheets"></div>
+			
 			<div id="server_stats" style="position: absolute; right: 2px; bottom: 2px; z-index: 1; color: white; text-align: right;">
 				<?php if (isset ($_GET['DEBUG'])) { ?>
 					Map PT: <span id="server_parsetime_map"></span><br />

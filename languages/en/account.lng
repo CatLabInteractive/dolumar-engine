@@ -141,6 +141,10 @@ changePass = "Change password"
 account = "Account Options"
 resetAccount = "Reset account"
 vacationMode = "Vacation mode"
+layout = "Interface layout"
+layoutAuto = "Automatic"
+layoutDesktop = "Desktop"
+layoutMobile = "Mobile"
 
 [changepass]
 changePass = "Change your password"

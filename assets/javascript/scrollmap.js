@@ -32,6 +32,26 @@ function TiledImageViewer(
     this.tileX = imagewidth;
     this.tileY = imageheight;
 
+    // Client-side scale of the map (1 = native). div.style.left/top stay in screen pixels;
+    // a map point p is drawn on screen at left + p * scale.
+    this.scale = 1;
+
+    // Optional hooks: canPinch() says whether a two-finger pinch may change the scale,
+    // onscale(scale) is called when a pinch ends.
+    this.canPinch = null;
+    this.onscale = null;
+
+    // Optional hook: isTouchLayout() says whether selectLocation uses the touch flow
+    // (ghost fixed at the centre, Place/Cancel buttons) instead of the mouse flow.
+    this.isTouchLayout = null;
+
+    // Optional hook: selectLabel(name) returns the translated text of a touch flow button
+    // ('cancel' or 'place'); a falsy result keeps the English text.
+    this.selectLabel = null;
+
+    // True while a touch flow selection is open (it never disables the map controls).
+    this.selectingTouch = false;
+
     this.div = document.createElement('div');
 
     this.el.appendChild(this.div);
@@ -73,7 +93,7 @@ TiledImageViewer.prototype.setTilesizes = function (imagewidth, imageheight) {
     locx += (parseInt(this.div.style.width) / 2) * (1 - zx);
     locy += (parseInt(this.div.style.height) / 2) * (1 - zy);
 
-    this.jumpTo(locx, locy, false);
+    this.jumpTo(locx / this.scale, locy / this.scale, false);
 
     /*
     this.div.style.left = locx + 'px';
@@ -88,11 +108,53 @@ TiledImageViewer.prototype.setTilesizes = function (imagewidth, imageheight) {
 TiledImageViewer.prototype.getLocation = function () {
     var obj =
         {
-            'left': parseInt(this.div.style.left) * -1,
-            'top': parseInt(this.div.style.top) * -1
+            'left': parseInt(this.div.style.left) * -1 / this.scale,
+            'top': parseInt(this.div.style.top) * -1 / this.scale
         };
 
     return obj;
+}
+
+TiledImageViewer.prototype.getScale = function () {
+    return this.scale;
+}
+
+/*
+    Scale the map to s (clamped to [0.5, 1.5]), keeping the map point under
+    the centre of the view at the centre.
+ */
+TiledImageViewer.prototype.setScale = function (s) {
+    s = parseFloat(s);
+    if (isNaN(s)) {
+        return;
+    }
+
+    s = Math.min(1.5, Math.max(0.5, s));
+
+    var w = parseInt(this.div.style.width);
+    var h = parseInt(this.div.style.height);
+
+    // Map point at the centre of the view, at the old scale
+    var cx = (w / 2 - parseInt(this.div.style.left)) / this.scale;
+    var cy = (h / 2 - parseInt(this.div.style.top)) / this.scale;
+
+    this.scale = s;
+
+    this.div.style.transformOrigin = '0 0';
+    this.div.style.transform = 'scale(' + s + ')';
+
+    var nX = Math.round(w / 2 - cx * s);
+    var nY = Math.round(h / 2 - cy * s);
+
+    this.div.style.left = nX + 'px';
+    this.div.style.top = nY + 'px';
+
+    // Recalculate the number of tiles to show; this also draws the visible tiles.
+    this.resize();
+
+    if (typeof(this.onscroll) != 'undefined') {
+        this.onscroll(-nX / s, -nY / s, 0, 0);
+    }
 }
 
 TiledImageViewer.prototype.addInnerHTML = function (ah) {
@@ -108,8 +170,8 @@ TiledImageViewer.prototype.resize = function (x, y) {
         y = parseInt(this.div.style.height);
     }
 
-    this.displaySizeX = Math.ceil((1 * x) / this.tileX) + 1;
-    this.displaySizeY = Math.ceil((1 * y) / this.tileY) + 1;
+    this.displaySizeX = Math.ceil((1 * x) / this.scale / this.tileX) + 1;
+    this.displaySizeY = Math.ceil((1 * y) / this.scale / this.tileY) + 1;
 
     this.div.style.width = x + 'px';
     this.div.style.height = y + 'px';
@@ -121,8 +183,8 @@ TiledImageViewer.prototype.resize = function (x, y) {
 TiledImageViewer.prototype.drawVisibleImages = function () {
     var newLoadedTiles = 0;
 
-    var x = Math.floor(parseInt(this.div.style.left) / parseInt(this.tileX));
-    var y = Math.floor(parseInt(this.div.style.top) / parseInt(this.tileY));
+    var x = Math.floor((parseInt(this.div.style.left) / this.scale) / parseInt(this.tileX));
+    var y = Math.floor((parseInt(this.div.style.top) / this.scale) / parseInt(this.tileY));
 
     var newLoadedMapTiles = new Object();
 
@@ -235,7 +297,12 @@ TiledImageViewer.prototype.enableControls = function () {
         //alert ('test');
         //console.log (event);
         self.el.onmousedown = null;
-        TIV_touchBegin(e, self);
+
+        // A second finger starts a pinch, which never drags.
+        var pinch = e.touches && e.touches.length === 2 && TIV_pinchBegin(e, self);
+        if (!pinch && !self.pinching) {
+            TIV_touchBegin(e, self);
+        }
 
         if (e.stopPropagation) e.stopPropagation();
         if (e.preventDefault) e.preventDefault();
@@ -246,6 +313,8 @@ TiledImageViewer.prototype.enableControls = function () {
     }, false);
 
     self.el.addEventListener("touchend", TIV_touchEnd, false);
+    // An OS-cancelled gesture (edge swipe, notification) must reset drag and pinch state too.
+    self.el.addEventListener("touchcancel", TIV_touchEnd, false);
 
     self.el.addEventListener("mousedown", function (e) {
         if (mouseEvents) {
@@ -275,7 +344,7 @@ TiledImageViewer.prototype.scrollBy = function (x, y) {
     this.div.style.top = nY + 'px';
 
     if (typeof(this.onscroll) != 'undefined') {
-        this.onscroll(-nX, -nY, x, y);
+        this.onscroll(-nX / this.scale, -nY / this.scale, x, y);
     }
 }
 
@@ -288,8 +357,8 @@ TiledImageViewer.prototype.jumpTo = function (x, y, center) {
     var oX = parseInt(this.div.style.width);
     var oY = parseInt(this.div.style.height);
 
-    var nX = x;
-    var nY = y;
+    var nX = x * this.scale;
+    var nY = y * this.scale;
 
     if (center) {
         nX += Math.ceil(oX / 2);
@@ -303,7 +372,7 @@ TiledImageViewer.prototype.jumpTo = function (x, y, center) {
     this.drawVisibleImages();
 
     if (typeof(this.onscroll) != 'undefined') {
-        this.onscroll(-nX, -nY, (nX - oX), (nY - oY));
+        this.onscroll(-nX / this.scale, -nY / this.scale, (nX - oX), (nY - oY));
     }
 }
 
@@ -332,6 +401,13 @@ TiledImageViewer.prototype.updatePointerBackgroundImage = function (image) {
 TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image) {
     var self = this;
     this.selecting = true;
+
+    if (typeof(this.isTouchLayout) == 'function' && this.isTouchLayout()) {
+        this.selectLocationTouch(callback, onFinish, image);
+        return;
+    }
+
+    this.selectingTouch = false;
 
     this.el.onmousedown = TIV_selectLocation;
     this.el.onmouseup = function (e) {
@@ -383,6 +459,90 @@ TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image)
     */
 }
 
+// Touch flow: the ghost stays at the centre of the map, the player pans the map under it
+// and confirms with Place (or Cancel). No overlay, so panning keeps working.
+TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, image) {
+    var self = this;
+
+    this.selLocAct = callback;
+    this.onFinish = onFinish;
+    this.selectingTouch = true;
+
+    var pointer = this.el.tivpointer;
+    if (pointer && typeof(image) != 'undefined' && image != null) {
+        this.updatePointerBackgroundImage(image);
+
+        var rect = this.el.getBoundingClientRect();
+        pointer.style.position = 'fixed';
+        pointer.style.left = (rect.left + rect.width / 2) + 'px';
+        pointer.style.top = (rect.top + rect.height / 2) + 'px';
+        pointer.style.pointerEvents = 'none';
+        pointer.style.transformOrigin = 'center';
+        pointer.style.transform = 'translate(-50%, -50%) scale(' + this.scale + ')';
+    }
+
+    this.removeSelectActions();
+
+    var actions = document.createElement('div');
+    actions.id = 'map_select_actions';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'cancel';
+    cancel.appendChild(document.createTextNode(this.getSelectLabel('cancel', 'Cancel')));
+    cancel.onclick = function () {
+        self.cancelLocationClick();
+        return false;
+    };
+
+    var place = document.createElement('button');
+    place.type = 'button';
+    place.className = 'place';
+    place.appendChild(document.createTextNode(this.getSelectLabel('place', 'Place')));
+    place.onclick = function () {
+        self.placeAtCenter();
+        return false;
+    };
+
+    // The map's own touchstart/mousedown handlers cancel the default action (no click
+    // would follow) and start a drag; keep them away from the buttons.
+    var stop = function (e) {
+        if (e.stopPropagation) e.stopPropagation();
+        e.cancelBubble = true;
+    };
+    actions.addEventListener('touchstart', stop, false);
+    actions.addEventListener('touchend', stop, false);
+    actions.addEventListener('mousedown', stop, false);
+    actions.addEventListener('mouseup', stop, false);
+
+    actions.appendChild(cancel);
+    actions.appendChild(place);
+    this.el.appendChild(actions);
+};
+
+// Touch flow: button text from the selectLabel hook, or the English fallback.
+TiledImageViewer.prototype.getSelectLabel = function (name, fallback) {
+    var label = typeof(this.selectLabel) == 'function' ? this.selectLabel(name) : null;
+
+    return label ? label : fallback;
+};
+
+// Touch flow: choose the map point under the centre of the viewer.
+TiledImageViewer.prototype.placeAtCenter = function () {
+    var rect = this.el.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+
+    return this.selectLocationClick(cx, cy);
+};
+
+TiledImageViewer.prototype.removeSelectActions = function () {
+    var actions = document.getElementById('map_select_actions');
+    if (actions && actions.parentNode) {
+        actions.parentNode.removeChild(actions);
+    }
+};
+
 TiledImageViewer.prototype.drawOverlay = function() {
 
     this.removeOverlay();
@@ -422,8 +582,8 @@ TiledImageViewer.prototype.setDblclickLocation = function (act) {
 }
 
 TiledImageViewer.prototype.dblClickAction = function (x, y) {
-    x = (x - parseInt(this.div.style.left));
-    y = (y - parseInt(this.div.style.top));
+    x = (x - parseInt(this.div.style.left)) / this.scale;
+    y = (y - parseInt(this.div.style.top)) / this.scale;
 
     this.doubleClickAction(x, y);
 }
@@ -433,8 +593,8 @@ TiledImageViewer.prototype.selectLocationClick = function (x, y) {
         return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]';
     }
 
-    x = (x - parseInt(this.div.style.left));
-    y = (y - parseInt(this.div.style.top));
+    x = (x - parseInt(this.div.style.left)) / this.scale;
+    y = (y - parseInt(this.div.style.top)) / this.scale;
 
     if (this.selLocAct && isFunction(this.selLocAct)) {
         this.selLocAct(x, y);
@@ -457,10 +617,27 @@ TiledImageViewer.prototype.cancelLocationClick = function (x, y) {
 
     if (this.el.tivpointer) {
         this.el.tivpointer.style.display = 'none';
+
+        // Undo the touch flow's placement so the mouse flow starts as before.
+        if (this.el.tivpointer.style.position == 'fixed') {
+            this.el.tivpointer.style.position = 'absolute';
+            this.el.tivpointer.style.transform = '';
+            this.el.tivpointer.style.transformOrigin = '';
+            this.el.tivpointer.style.pointerEvents = '';
+        }
     }
 
+    this.removeSelectActions();
+
     window.onmousemove = '';
-    this.enableControls();
+
+    // The touch flow left the map controls in place; enabling them again would add
+    // another set of listeners on every placement.
+    if (this.selectingTouch) {
+        this.selectingTouch = false;
+    } else {
+        this.enableControls();
+    }
     this.el.style.cursor = 'default';
 
     var self = this;
@@ -599,6 +776,13 @@ function TIV_touchBegin(e, self) {
 function TIV_touchEnd(e) {
     var o = this._TIV_obj;
 
+    if (o.pinching && (!e || !e.touches || e.touches.length < 2)) {
+        o.pinching = false;
+        if (typeof(o.onscale) == 'function') {
+            o.onscale(o.getScale());
+        }
+    }
+
     o.removeOverlay();
 
     o.dragging = false;
@@ -607,6 +791,45 @@ function TIV_touchEnd(e) {
     // Recalculate
     o.drawVisibleImages();
 
+    return false;
+}
+
+function TIV_touchDistance(e) {
+    var dx = e.touches[0].clientX - e.touches[1].clientX;
+    var dy = e.touches[0].clientY - e.touches[1].clientY;
+
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function TIV_pinchBegin(e, self) {
+    var o = self.el._TIV_obj;
+
+    if (typeof(o.canPinch) != 'function' || !o.canPinch()) {
+        return false;
+    }
+
+    // Stop a drag the first finger may have started
+    o.dragging = false;
+
+    o.pinching = true;
+    o.pinchStartDistance = TIV_touchDistance(e);
+    o.pinchStartScale = o.getScale();
+
+    self.el.addEventListener('touchmove', TIV_pinchMove, false);
+
+    return true;
+}
+
+function TIV_pinchMove(e) {
+    var o = this._TIV_obj;
+
+    if (!o.pinching || !e.touches || e.touches.length < 2 || !(o.pinchStartDistance > 0)) {
+        return false;
+    }
+
+    o.setScale(o.pinchStartScale * (TIV_touchDistance(e) / o.pinchStartDistance));
+
+    if (e.preventDefault) e.preventDefault();
     return false;
 }
 
@@ -639,6 +862,10 @@ function TIV_touchMove(e) {
 
     if (!e) {
         e = window.event;
+    }
+
+    if (o.pinching) {
+        return false;
     }
 
     if (
