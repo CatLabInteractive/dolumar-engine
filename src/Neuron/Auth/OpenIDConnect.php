@@ -60,10 +60,20 @@ class Neuron_Auth_OpenIDConnect
 		return (int) $acc[0]['user_id'];
 	}
 
-	public function getAuthorizationUrl (): string
+	/**
+	 * The scope to request. The credits scope is only asked for when credits
+	 * are configured, so login keeps working before the Accounts setup is done.
+	 */
+	public static function requestedScope (?bool $withCredits = null): string
+	{
+		$withCredits ??= Neuron_GameServer_Credits_AccountsClient::fromConfig () !== null;
+		return $withCredits ? self::SCOPE . ' credits' : self::SCOPE;
+	}
+
+	public function getAuthorizationUrl (?bool $withCredits = null): string
 	{
 		$url = $this->provider->getAuthorizationUrl ([
-			'scope' => self::SCOPE,
+			'scope' => self::requestedScope ($withCredits),
 			// league adds approval_prompt=auto by default; null keeps it out of the query.
 			'approval_prompt' => null,
 		]);
@@ -75,7 +85,7 @@ class Neuron_Auth_OpenIDConnect
 	/**
 	 * Exchanges the authorization code from the callback query for the user's profile.
 	 *
-	 * @return array{id:string,email:string,username:string,verified_email:bool}
+	 * @return array{id:string,email:string,username:string,verified_email:bool,access_token:string}
 	 * @throws RuntimeException on a state mismatch, a missing code or a profile without id.
 	 */
 	public function getProfile (array $query): array
@@ -111,6 +121,7 @@ class Neuron_Auth_OpenIDConnect
 			'email' => (string) ($userInfo['email'] ?? ''),
 			'username' => (string) ($userInfo['username'] ?? ''),
 			'verified_email' => (bool) ($userInfo['verified_email'] ?? false),
+			'access_token' => (string) $token->getToken (),
 		];
 	}
 }

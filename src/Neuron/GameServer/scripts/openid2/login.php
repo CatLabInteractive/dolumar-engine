@@ -52,6 +52,31 @@ function handleOpenIDConnectAuthentication() {
         }
     }
 
+    // Keep the Accounts token and profile for credits. This must never block login.
+    try {
+        $accessToken = (string) ($userInfo['access_token'] ?? '');
+        if ($accessToken !== '') {
+            $profileId = null;
+            $client = Neuron_GameServer_Credits_AccountsClient::fromConfig();
+            if ($client !== null) {
+                try {
+                    $profileId = $client->getPersonalProfileId($accessToken);
+                } catch (Neuron_GameServer_Credits_AccountsUnavailable | Neuron_GameServer_Credits_AccountsRejected $e) {
+                    error_log('OIDC login: personal profile lookup failed: ' . get_class($e));
+                }
+            }
+
+            Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance()->save(
+                $openIdProfileUrl,
+                $profileId,
+                $accessToken,
+                Neuron_Auth_OpenIDConnect::requestedScope()
+            );
+        }
+    } catch (\Throwable $e) {
+        error_log('OIDC login: could not store Accounts token: ' . get_class($e));
+    }
+
     // New session id after login, so an id planted before login is worthless.
     session_regenerate_id(true);
 
