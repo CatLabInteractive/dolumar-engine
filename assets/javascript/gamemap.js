@@ -375,6 +375,14 @@ Game.map =
 			return Game.layout.mode () === 'mobile';
 		};
 
+		// Translated Place/Cancel labels come from the Menu panel's data-label-* attributes.
+		Game.map.oScrollMap.selectLabel = function (name)
+		{
+			var menu = $('menu');
+
+			return menu ? menu.getAttribute ('data-label-select' + name) : null;
+		};
+
 		Game.map.applyStoredScale ();
 
 		// The desktop layout always shows the map at scale 1.

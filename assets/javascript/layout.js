@@ -53,12 +53,20 @@ Game.layout = {
 		return 'desktop';
 	},
 
-	'init' : function ()
+	/*
+		Read the player's preference from the shell (CONFIG_LAYOUT).
+	*/
+	'loadPreference' : function ()
 	{
 		if (typeof CONFIG_LAYOUT != 'undefined')
 		{
 			Game.layout.preference = CONFIG_LAYOUT;
 		}
+	},
+
+	'init' : function ()
+	{
+		Game.layout.loadPreference ();
 
 		Game.layout.apply ();
 
@@ -80,11 +88,7 @@ Game.layout = {
 		var cls = document.body.className.replace (/(^|\s)layout-(desktop|mobile)(?=\s|$)/g, ' ');
 		document.body.className = (cls + ' layout-' + mode).replace (/^\s+|\s+$/g, '').replace (/\s{2,}/g, ' ');
 
-		var meta = document.getElementById ('viewport');
-		if (meta)
-		{
-			meta.setAttribute ('content', (mode == 'desktop' && layout.isTouch ()) ? layout.DESKTOP_TOUCH_VIEWPORT : layout.DEFAULT_VIEWPORT);
-		}
+		layout.applyViewport (mode);
 
 		var previous = layout.current;
 		layout.current = mode;
@@ -95,6 +99,28 @@ Game.layout = {
 			{
 				layout.callbacks[i] (mode);
 			}
+		}
+	},
+
+	/*
+		Set the viewport meta for a mode. Writes only when the content changes:
+		rewriting it on every resize (URL bar, keyboard) can make iOS re-zoom.
+	*/
+	'applyViewport' : function (mode)
+	{
+		var layout = Game.layout;
+		var meta = document.getElementById ('viewport');
+
+		if (!meta)
+		{
+			return;
+		}
+
+		var content = (mode == 'desktop' && layout.isTouch ()) ? layout.DESKTOP_TOUCH_VIEWPORT : layout.DEFAULT_VIEWPORT;
+
+		if (meta.getAttribute ('content') !== content)
+		{
+			meta.setAttribute ('content', content);
 		}
 	},
 
@@ -109,3 +135,11 @@ Game.layout = {
 		Game.layout.callbacks.push (fn);
 	}
 };
+
+/*
+	Set the viewport as soon as this script is parsed (the meta and CONFIG_LAYOUT are already
+	there), so a phone in the desktop layout does not first render at scale 1 until window.load.
+	The body class is set later, by init ().
+*/
+Game.layout.loadPreference ();
+Game.layout.applyViewport (Game.layout.mode ());

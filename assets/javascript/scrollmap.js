@@ -45,6 +45,13 @@ function TiledImageViewer(
     // (ghost fixed at the centre, Place/Cancel buttons) instead of the mouse flow.
     this.isTouchLayout = null;
 
+    // Optional hook: selectLabel(name) returns the translated text of a touch flow button
+    // ('cancel' or 'place'); a falsy result keeps the English text.
+    this.selectLabel = null;
+
+    // True while a touch flow selection is open (it never disables the map controls).
+    this.selectingTouch = false;
+
     this.div = document.createElement('div');
 
     this.el.appendChild(this.div);
@@ -306,6 +313,8 @@ TiledImageViewer.prototype.enableControls = function () {
     }, false);
 
     self.el.addEventListener("touchend", TIV_touchEnd, false);
+    // An OS-cancelled gesture (edge swipe, notification) must reset drag and pinch state too.
+    self.el.addEventListener("touchcancel", TIV_touchEnd, false);
 
     self.el.addEventListener("mousedown", function (e) {
         if (mouseEvents) {
@@ -398,6 +407,8 @@ TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image)
         return;
     }
 
+    this.selectingTouch = false;
+
     this.el.onmousedown = TIV_selectLocation;
     this.el.onmouseup = function (e) {
         self.el.onmousedown = null;
@@ -455,6 +466,7 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
 
     this.selLocAct = callback;
     this.onFinish = onFinish;
+    this.selectingTouch = true;
 
     var pointer = this.el.tivpointer;
     if (pointer && typeof(image) != 'undefined' && image != null) {
@@ -477,7 +489,7 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
     var cancel = document.createElement('button');
     cancel.type = 'button';
     cancel.className = 'cancel';
-    cancel.appendChild(document.createTextNode('Cancel'));
+    cancel.appendChild(document.createTextNode(this.getSelectLabel('cancel', 'Cancel')));
     cancel.onclick = function () {
         self.cancelLocationClick();
         return false;
@@ -486,7 +498,7 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
     var place = document.createElement('button');
     place.type = 'button';
     place.className = 'place';
-    place.appendChild(document.createTextNode('Place'));
+    place.appendChild(document.createTextNode(this.getSelectLabel('place', 'Place')));
     place.onclick = function () {
         self.placeAtCenter();
         return false;
@@ -506,6 +518,13 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
     actions.appendChild(cancel);
     actions.appendChild(place);
     this.el.appendChild(actions);
+};
+
+// Touch flow: button text from the selectLabel hook, or the English fallback.
+TiledImageViewer.prototype.getSelectLabel = function (name, fallback) {
+    var label = typeof(this.selectLabel) == 'function' ? this.selectLabel(name) : null;
+
+    return label ? label : fallback;
 };
 
 // Touch flow: choose the map point under the centre of the viewer.
@@ -611,7 +630,14 @@ TiledImageViewer.prototype.cancelLocationClick = function (x, y) {
     this.removeSelectActions();
 
     window.onmousemove = '';
-    this.enableControls();
+
+    // The touch flow left the map controls in place; enabling them again would add
+    // another set of listeners on every placement.
+    if (this.selectingTouch) {
+        this.selectingTouch = false;
+    } else {
+        this.enableControls();
+    }
     this.el.style.cursor = 'default';
 
     var self = this;
