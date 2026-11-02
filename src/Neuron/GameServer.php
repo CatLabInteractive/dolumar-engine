@@ -718,7 +718,9 @@ class Neuron_GameServer
 
 
 
-			if (isset ($_COOKIE['session_id']))
+			// A stale cookie (old server, earlier session) must be replaced,
+			// otherwise the next request runs on the old session.
+			if (isset ($_COOKIE['session_id']) && $_COOKIE['session_id'] === $session_id)
 			{
 				// All is okay now
 				unset ($parameters['session_pass']);

@@ -49,7 +49,12 @@ class Neuron_DB_MySQL extends Neuron_DB_Database
 			$connection = @ new MySQLi (DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_DATABASE, $port);
 
 			// Never output host or credentials
-			if ($connection->connect_errno || !$connection->set_charset ($charset))
+			// The game's queries were written for MySQL 5 semantics (no
+			// ONLY_FULL_GROUP_BY / strict mode), so use a permissive sql_mode
+			$sqlMode = defined ('DB_SQL_MODE') ? DB_SQL_MODE : 'NO_ENGINE_SUBSTITUTION';
+
+			if ($connection->connect_errno || !$connection->set_charset ($charset)
+				|| !$connection->query ("SET SESSION sql_mode = '" . $connection->real_escape_string ($sqlMode) . "'"))
 			{
 				throw new RuntimeException ('Database connection failed');
 			}
