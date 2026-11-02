@@ -33,25 +33,28 @@ class Neuron_DB_MySQL extends Neuron_DB_Database
 		define ('DB_PASSWORD', 'myuser');
 		define ('DB_SERVER', 'localhost');
 		define ('DB_DATABASE', 'dolumar');
+		define ('DB_PORT', 3306); // optional
+		define ('DB_CHARSET', 'utf8mb4'); // optional
 	*/
 	private function connect ()
 	{
 		if (!isset ($this->connection))
 		{
-			try
+			// Keep PHP 7 semantics: mysqli reports errors through return values, not exceptions
+			mysqli_report (MYSQLI_REPORT_OFF);
+
+			$port = defined ('DB_PORT') ? (int) DB_PORT : 3306;
+			$charset = defined ('DB_CHARSET') ? DB_CHARSET : 'utf8mb4';
+
+			$connection = @ new MySQLi (DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_DATABASE, $port);
+
+			// Never output host or credentials
+			if ($connection->connect_errno || !$connection->set_charset ($charset))
 			{
-				$this->connection = @ new MySQLi (DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_DATABASE);
-			}
-			catch (Exception $e)
-			{
-				echo $e;
+				throw new RuntimeException ('Database connection failed');
 			}
 
-			if (mysqli_connect_errno ())
-			{
-				printf ("Connect failed: %s\n", mysqli_connect_error());
-				exit();
-			}
+			$this->connection = $connection;
 		}
 	}
 
@@ -111,6 +114,7 @@ class Neuron_DB_MySQL extends Neuron_DB_Database
 		{
 			throw new Neuron_Core_Error ('Invalid parameter: escape cannot handle arrays.');
 		}
+		$this->connect ();
 		return $this->connection->real_escape_string ($txt);
 	}
 

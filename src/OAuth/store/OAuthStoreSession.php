@@ -124,7 +124,7 @@ class OAuthStoreSession extends OAuthStoreAbstract
 		//This method just needs to exist. It doesn't have to do anything!
 	}
 	
-	public function listServers ( $q = '', $user_id ) { throw new OAuthException2("OAuthStoreSession doesn't support " . __METHOD__); }
+	public function listServers ( $q, $user_id ) { throw new OAuthException2("OAuthStoreSession doesn't support " . __METHOD__); }
 	public function updateServer ( $server, $user_id, $user_is_admin = false ) { throw new OAuthException2("OAuthStoreSession doesn't support " . __METHOD__); }
 
 	public function updateConsumer ( $consumer, $user_id, $user_is_admin = false ) { throw new OAuthException2("OAuthStoreSession doesn't support " . __METHOD__); }

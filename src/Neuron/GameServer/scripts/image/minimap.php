@@ -21,10 +21,10 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-$width = isset ($_GET['width']) ? $_GET['width'] : 200;
-$tilesToLoad = isset ($_GET['tiles']) ? $_GET['tiles'] : ceil ($width / 4);
+$width = Neuron_Core_Tools::clampInt ($_GET['width'] ?? null, 1, 200, 200);
+$tilesToLoad = Neuron_Core_Tools::clampInt ($_GET['tiles'] ?? null, 1, 50, (int)ceil ($width / 4));
 
-$nocache = isset ($_GET['nocache']) ? true : false;
+$nocache = isset ($_GET['nocache']) && Neuron_GameServer::isAdminRequest ();
 
 /*
 	Return the background image.
@@ -120,7 +120,7 @@ function getBackgroundImage ($x, $y, $tilesToLoad, $usecache = true)
 				
 				);
 			
-				imagefilledpolygon($im, $punten, 4, $color);
+				imagefilledpolygon($im, $punten, $color);
 			}
 		}
 		
@@ -241,7 +241,7 @@ if (isset ($_GET['x']) && isset ($_GET['y']))
 				$px, 			$py + $halfTileY 	// Links
 			);
 			
-			imagefilledpolygon ($im, $punten, 4, $color);
+			imagefilledpolygon($im, $punten, $color);
 		}
 		
 		// Start output buffering

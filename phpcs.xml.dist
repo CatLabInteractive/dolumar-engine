@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<ruleset name="Dolumar engine PHP 8.4 compatibility">
+	<description>Checks src/ for PHP 8.4 compatibility.</description>
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+	<config name="testVersion" value="8.4-"/>
+	<rule ref="PHPCompatibility"/>
+	<file>src</file>
+</ruleset>

@@ -24,6 +24,7 @@
 class BBGS_Credits
 {
 	private $email;
+	private $openid;
 	private $openids = [];
 	private $openid_hashed = [];
 	private $gametoken;

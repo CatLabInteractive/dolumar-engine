@@ -262,8 +262,7 @@ class OAuthStorePDO extends OAuthStoreSQL
 	*/
 	public function install ()
 	{
-		// TODO: this depends on mysql extension
-		require_once dirname(__FILE__) . '/mysql/install.php';
+		throw new OAuthException2("OAuthStorePDO doesn't support " . __METHOD__);
 	}
 	
 }

@@ -89,6 +89,10 @@
 		var $lost_start_tags; // For repair when tags are badly mis-nested.
 		var $start_tags;	// An associative array of locations of start tags on the stack.
 		var $allow_ampersand; // If true, we use str_replace() instead of htmlspecialchars().
+		var $allow_ampsersand; // Misspelled duplicate of allow_ampersand that the code assigns to.
+		var $smiley_info;
+		var $stack;
+		var $lexer;
 		var $tag_marker;	// Set to '[', '<', '{', or '('.
 		var $ignore_newlines; // If true, newlines will be treated as normal whitespace.
 		var $plain_mode;	// Don't output tags:  Just output text/whitespace/newlines only.
@@ -288,8 +292,8 @@
 				return html_entity_decode($string);
 				
 			// Replace numeric entities.
-			$string = preg_replace('~&#x([0-9a-f]+);~ei', 'chr(hexdec("\\1"))', $string);
-			$string = preg_replace('~&#([0-9]+);~e', 'chr("\\1")', $string);
+			$string = preg_replace_callback('~&#x([0-9a-f]+);~i', function ($m) { return chr(hexdec($m[1])); }, $string);
+			$string = preg_replace_callback('~&#([0-9]+);~', function ($m) { return chr($m[1]); }, $string);
 			
 			// Replace literal entities.
 			$trans_tbl = get_html_translation_table(HTML_ENTITIES);
@@ -723,7 +727,7 @@
 
 					if (strlen(@$matches[2])) {
 						// We have one or more indexes, so break them apart and look up the requested data.
-						foreach (split(".", substr($matches[2], 1)) as $index) {
+						foreach (explode(".", substr($matches[2], 1)) as $index) {
 							if (is_array($value))
 								$value = @$value[$index];
 							else if (is_object($value)) {

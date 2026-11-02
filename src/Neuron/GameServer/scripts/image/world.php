@@ -21,6 +21,13 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+// Only used by the admin-only /test/worldmap page.
+if (!Neuron_GameServer::isAdminRequest ())
+{
+	http_response_code (403);
+	return;
+}
+
 define ('MAP_PERLIN_NO_CACHE', true);
 
 function color_cache ($im, $color)

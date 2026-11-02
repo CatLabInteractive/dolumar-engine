@@ -32,6 +32,8 @@ class BBGS_Invite
 	private $sGroup;
 	
 	private $sSkeletons;
+	private $sSkeleton;
+	private $senderMessage;
 	private $sValues;
 	
 	private $sXML;

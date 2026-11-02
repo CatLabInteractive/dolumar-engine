@@ -29,7 +29,7 @@ class Neuron_GameServer_Map_Display_Sprite
 	
 	private $color;
 
-	public function __construct ($uri, Neuron_GameServer_Map_Offset $offset = null)
+	public function __construct ($uri, ?Neuron_GameServer_Map_Offset $offset = null)
 	{
 		$this->uri = $uri;
 		

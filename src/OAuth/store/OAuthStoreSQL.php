@@ -74,27 +74,27 @@ abstract class OAuthStoreSQL extends OAuthStoreAbstract
 				
 				if (isset($options['password']))
 				{
-					$this->conn = mysql_connect($server, $username, $options['password']);
+					$this->conn = mysqli_connect($server, $username, $options['password']);
 				}
 				else
 				{
-					$this->conn = mysql_connect($server, $username);
+					$this->conn = mysqli_connect($server, $username);
 				}
 			}
 			else
 			{
 				// Try the default mysql connect
-				$this->conn = mysql_connect();
+				$this->conn = mysqli_connect();
 			}
 
 			if ($this->conn === false)
 			{
-				throw new OAuthException2('Could not connect to MySQL database: ' . mysql_error());
+				throw new OAuthException2('Could not connect to MySQL database: ' . mysqli_connect_error());
 			}
 
 			if (isset($options['database']))
 			{
-				if (!mysql_select_db($options['database'], $this->conn))
+				if (!mysqli_select_db($this->conn, $options['database']))
 				{
 					$this->sql_errcheck();
 				}
@@ -690,7 +690,7 @@ abstract class OAuthStoreSQL extends OAuthStoreAbstract
 	 * @param int user_id
 	 * @return array
 	 */	
-	public function listServers ( $q = '', $user_id )
+	public function listServers ( $q, $user_id )
 	{
 		$q    = trim(str_replace('%', '', $q));
 		$args = array();

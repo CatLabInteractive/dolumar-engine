@@ -29,6 +29,19 @@ $parameters = array ();
 $xml_name = 'browsergameshub';
 $xml_version = '1';
 
+/**
+ * Stop with HTTP 403 unless the current player is an admin.
+ */
+function requireApiAdmin ()
+{
+	if (!Neuron_GameServer::isAdminRequest ())
+	{
+		http_response_code (403);
+		echo '<p>Forbidden.</p>';
+		exit;
+	}
+}
+
 $login = Neuron_Core_Login::getInstance (0, false);
 if (isset ($_SERVER['PHP_AUTH_USER']) && 
 	isset ($_SERVER['PHP_AUTH_PW']))
@@ -42,10 +55,16 @@ if ($request == 'emailcert')
 	$id = Neuron_Core_Tools::getInput ('_REQUEST', 'id', 'int', false);
 	
 	$player = Neuron_GameServer::getPlayer ($id);
-	if ($player->isFound ())
+	if ($player && $player->isFound ())
 	{
-		$player->certifyEmail ($key);
-		echo '<p>Your E-mail adress has been verified.</p>';
+		if ($player->certifyEmail ($key))
+		{
+			echo '<p>Your E-mail adress has been verified.</p>';
+		}
+		else
+		{
+			echo '<p>Invalid link.</p>';
+		}
 	}
 	else
 	{
@@ -74,7 +93,7 @@ elseif ($request === 'unsubscribe')
 			else
 			{
 				echo '<p>Are you sure you want to unsubscribe from receiving Dolumar notifications?<br />';
-				echo '<a href="' . API_FULL_URL . 'unsubscribe?id=' . $id . '&key=' . $key . '&confirm=1">Yes</a> | ';
+				echo '<a href="' . htmlspecialchars (API_FULL_URL . 'unsubscribe?id=' . urlencode ($id) . '&key=' . urlencode ($key) . '&confirm=1') . '">Yes</a> | ';
 				echo '<a href="' . ABSOLUTE_URL . '">No</a> ';
 				echo '</p>';
 			}
@@ -156,37 +175,10 @@ else
 	// Requests
 	switch ($request)
 	{
-		case 'invitation':
-
-			$id = Neuron_Core_Tools::getInput ('_REQUEST', 'id', 'int', false);
-			
-			$player = Neuron_GameServer::getPlayer ($id);
-			if ($player->isFound ())
-			{
-				$sender = Neuron_GameServer_Player::getFromOpenID (Neuron_Core_Tools::getInput ('_REQUEST', 'sender', 'varchar'));
-				$receiver = Neuron_GameServer_Player::getFromOpenID (Neuron_Core_Tools::getInput ('_REQUEST', 'receiver', 'varchar'));
-
-				if (!$receiver)
-				{
-					// We have to somehow queue it.
-				}
-
-				else
-				{
-					$receiver->invitationGiftReceiver ($_REQUEST, $sender);
-					$sender->invitationGiftSender ($_REQUEST, $receiver);
-				}
-			}
-
-		break;
-
-		case 'phpinfo':
-			phpinfo ();
-			exit ();
-		break;
-		
 		case 'getlogs':
-		
+
+			requireApiAdmin ();
+
 			$id = Neuron_Core_Tools::getInput ('_GET', 'id', 'int', isset ($sInputs[2]) ? $sInputs[2] : 0);
 			$start = Neuron_Core_Tools::getInput ('_GET', 'start', 'int', 0);
 			$objLogs = Dolumar_Players_Logs::__getInstance ();
@@ -269,6 +261,7 @@ else
 		break;
 		
 		case 'clearcache':
+			requireApiAdmin ();
 			$output['content'] = Neuron_GameServer::getServer()->clearCache (isset ($_GET['clearMapCache']) && $_GET['clearMapCache'] == 'yes');
 		break;
 		
@@ -385,10 +378,12 @@ else
 	switch ($output_type)
 	{
 		case 'json':
+			header ('Content-Type: application/json');
 			echo json_encode ($output);
 		break;
 
 		case 'serialize':
+			header ('Content-Type: text/plain');
 			echo serialize ($output);
 		break;
 		
@@ -400,7 +395,7 @@ else
 		case 'print':
 		default:
 			echo '<pre>';
-			print_r ($output);
+			echo htmlspecialchars (print_r ($output, true));
 			echo '</pre>';
 		break;
 	}

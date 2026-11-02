@@ -698,7 +698,7 @@ class OAuthStorePostgreSQL extends OAuthStoreAbstract
      * @param int user_id
      * @return array
      */
-    public function listServers ( $q = '', $user_id )
+    public function listServers ( $q, $user_id )
     {
         $q    = trim(str_replace('%', '', $q));
         $args = array();

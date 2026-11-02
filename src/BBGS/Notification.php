@@ -32,6 +32,7 @@ class BBGS_Notification
 	private $sGroup;
 	
 	private $sSkeletons;
+	private $sSkeleton;
 	private $sValues;
 	
 	private $sXML;

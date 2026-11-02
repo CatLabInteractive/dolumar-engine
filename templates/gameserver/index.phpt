@@ -29,10 +29,7 @@
 			var CONFIG_GAME_DOMAIN = '<?=$_SERVER['SERVER_NAME']?>';
 			var CONFIG_STATIC_GAME_URL = '<?=STATIC_ABSOLUTE_URL?>';<?php
 			echo "\n";
-			foreach ($_GET as $k => $v)
-			{
-				echo "\t\t\tvar PARAM_".strtoupper ($k)." = '".$v."';\n";
-			}
+			echo Neuron_Core_Tools::getJavascriptParamDeclarations ($_GET);
 			?>
 
 			<?php if (isset ($_SESSION['hide_advertisement']) && $_SESSION['hide_advertisement']) { ?>

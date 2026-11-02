@@ -51,6 +51,7 @@ class Neuron_Profiler_Profiler
 	
 	private $oRoot;
 	private $oCurAction;
+	private $active = false;
 	
 	public function __construct ()
 	{
