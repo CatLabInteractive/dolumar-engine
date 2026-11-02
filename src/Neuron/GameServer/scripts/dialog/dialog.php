@@ -57,15 +57,29 @@ function handleOpenWindowRequest ($windows)
 	{
 		if ($window)
 		{
-			$window->setSettings ();
-
-			$window->setDom ($dom);
-
-			// Append new window xml
-			$node = $window->getNewWindow ();
-			if ($node)
+			// One window failing must not drop the windows after it. The initial windows end with the invisible
+			// map updater, so a single broken window used to stop the map from ever showing new buildings.
+			try
 			{
-				$root->appendChild ($node);
+				$window->setSettings ();
+
+				$window->setDom ($dom);
+
+				// Append new window xml
+				$node = $window->getNewWindow ();
+				if ($node)
+				{
+					$root->appendChild ($node);
+				}
+			}
+			catch (Throwable $e)
+			{
+				Neuron_ErrorHandler_Handler::getInstance ()->notify ($e);
+
+				if (defined ('OUTPUT_DEBUG_DATA') && OUTPUT_DEBUG_DATA)
+				{
+					echo $e;
+				}
 			}
 		}
 	}
@@ -108,7 +122,7 @@ if (is_array ($openwindows))
 				$profiler->stop ();
 			}
 		}
-		catch (Exception $e)
+		catch (Throwable $e)
 		{
 			// Send a mail
             Neuron_ErrorHandler_Handler::getInstance()->notify($e);
@@ -160,7 +174,7 @@ foreach ($updatewindows as $window)
 			$root->appendChild ($updates);
 		}
 	}
-	catch (Exception $e)
+	catch (Throwable $e)
 	{
 		// Send a mail
         Neuron_ErrorHandler_Handler::getInstance()->notify($e);
