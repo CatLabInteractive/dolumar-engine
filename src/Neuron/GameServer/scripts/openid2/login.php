@@ -52,6 +52,19 @@ function handleOpenIDConnectAuthentication() {
         }
     }
 
+    // Keep the Accounts token and profile for credits (only when credits are
+    // configured). This must never block login.
+    try {
+        Neuron_GameServer_Mappers_CatLabAuthMapper::getInstance()->rememberLogin(
+            Neuron_GameServer_Credits_AccountsClient::fromConfig(),
+            $openIdProfileUrl,
+            (string) ($userInfo['access_token'] ?? ''),
+            Neuron_Auth_OpenIDConnect::requestedScope()
+        );
+    } catch (\Throwable $e) {
+        error_log('OIDC login: could not store Accounts token: ' . get_class($e));
+    }
+
     // New session id after login, so an id planted before login is worthless.
     session_regenerate_id(true);
 

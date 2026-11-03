@@ -128,33 +128,39 @@ elseif ($request == 'reset')
 	}
 }
 
-elseif ($request == 'spendcredit')
+elseif ($request == 'creditstart' || $request == 'creditnotify')
 {
-	$profiler = Neuron_Profiler_Profiler::getInstance (true);
-
-	$plid = Neuron_Core_Tools::getInput ('_GET', 'id', 'int');
-
-	$transaction_id 	= Neuron_Core_Tools::getInput ('_GET', 'transaction_id', 'varchar');
-	$transaction_key 	= Neuron_Core_Tools::getInput ('_GET', 'transaction_key', 'varchar');
-
-	$player = Neuron_GameServer::getPlayer ($plid);
-	if ($player)
+	$client = Neuron_GameServer_Credits_AccountsClient::fromConfig ();
+	if ($client === null)
 	{
-		if ($player->handleUseRequest ($_GET, $transaction_id, $transaction_key))
-		{
-			echo '<p>Premium action was executed.</p>';
-		}
-		else
-		{
-			echo '<p>Something went wrong: '.$player->getError ().'</p>';
-		}
+		http_response_code (404);
+		echo '<p>Credits are not available.</p>';
+		exit;
+	}
+
+	$handler = new Neuron_GameServer_Credits_ApiHandler
+	(
+		new Neuron_GameServer_Credits_PurchaseService ($client),
+		$client->getBaseUrl ()
+	);
+
+	if ($request == 'creditstart')
+	{
+		// Always the logged-in session player, never an id from the URL.
+		$result = $handler->start (Neuron_GameServer::getPlayer (), $_GET);
 	}
 	else
 	{
-		echo '<p>Invalid input: user not found.</p>';
+		$result = $handler->notify ($_SERVER['REQUEST_METHOD'] ?? 'GET', $_POST);
 	}
-	
-	echo "\n\nProfiler: \n" . $profiler;
+
+	http_response_code ($result['code']);
+	if ($result['location'] !== null)
+	{
+		header ('Location: ' . $result['location']);
+	}
+	echo $result['body'];
+	exit;
 }
 
 else
