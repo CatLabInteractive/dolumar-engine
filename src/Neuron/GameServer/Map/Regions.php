@@ -53,19 +53,4 @@ class Neuron_GameServer_Map_Regions
 
 		return $out;
 	}
-
-	/**
-	* Cache key for a region set, independent of the order of the regions.
-	*/
-	public static function cacheKey ($regions, $tilesPerRegion)
-	{
-		$keys = array ();
-		foreach ($regions as $v)
-		{
-			$keys[] = intval ($v[0]) . ',' . intval ($v[1]);
-		}
-		sort ($keys, SORT_STRING);
-
-		return 'movingobjects:' . intval ($tilesPerRegion) . ':' . implode (';', $keys);
-	}
 }

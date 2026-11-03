@@ -20,13 +20,6 @@ class RegionsTest extends TestCase
 		$this->assertEqualsWithDelta(5.0, $areas[0]->getCenter()->y(), 0.001);
 	}
 
-	public function testCacheKeyIsOrderIndependent(): void
-	{
-		$a = Neuron_GameServer_Map_Regions::cacheKey([[1, 0], [0, 0]], 10);
-		$b = Neuron_GameServer_Map_Regions::cacheKey([[0, 0], [1, 0]], 10);
-		$this->assertSame($a, $b);
-		$this->assertSame('movingobjects:10:0,0;1,0', $a);
-	}
 
 	public function testManagerDefaultHasNoMovingObjects(): void
 	{

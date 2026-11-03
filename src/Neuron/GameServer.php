@@ -1007,7 +1007,11 @@ class Neuron_GameServer
 			$objects = $map->getMapObjectManager ()->getMovingObjects ($areas, $player);
 		}
 
-		$secret = sha1 ((defined ('DB_PASSWORD') ? DB_PASSWORD : '') . 'mapobjects');
+		// Key for the anonymous ids; without a configured password the
+		// exporter fails closed and sends no anonymous objects.
+		$secret = (defined ('DB_PASSWORD') && DB_PASSWORD !== '')
+			? hash ('sha256', 'mapobjects:' . DB_PASSWORD)
+			: '';
 		$exporter = new Neuron_GameServer_Map_MovingObjectsExporter ($secret, 30);
 
 		return array ('status' => 200, 'body' => $exporter->export ($objects, $player, $now));

@@ -337,6 +337,11 @@ class Neuron_GameServer_Map_Movement
 
 	/**
 	* Plain array for JSON export: start, end and the path points.
+	* The points are the movement's locations as given (for a curved
+	* movement these are its control points, and acceleration is not
+	* applied): the client interpolates linearly from the first to the
+	* last point, which is exact for the straight, constant-speed
+	* movements this is used for.
 	*/
 	public function getPathData ()
 	{

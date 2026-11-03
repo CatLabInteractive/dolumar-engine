@@ -118,4 +118,19 @@ class MovingObjectsExporterTest extends TestCase
 		sort($sorted, SORT_STRING);
 		$this->assertSame($sorted, $first, 'sorted by the exported id');
 	}
+
+	public function testWithoutASecretUnrelatedObjectsAreNotSentAtAll(): void
+	{
+		// Fail closed: with a public salt the anonymous ids could be reversed by enumeration.
+		$out = (new Neuron_GameServer_Map_MovingObjectsExporter(''))->export(
+			[$this->obj('b:1', false, 'attack'), $this->obj('s:2', true, 'squad', 'S')], null, 1050);
+		$this->assertCount(1, $out['objects']);
+		$this->assertSame('s:2', $out['objects'][0]['id']);
+	}
+
+	public function testAnonymousIdIsAKeyedHashNotASaltedDigest(): void
+	{
+		$e = new Neuron_GameServer_Map_MovingObjectsExporter('k');
+		$this->assertSame('a:' . substr(hash_hmac('sha256', 'b:1', 'k'), 0, 12), $e->anonymousId('b:1'));
+	}
 }
