@@ -14,7 +14,7 @@ Game.mapObjects =
 
 	'objects' : {},		// id -> { data: <server object>, sprite: <element>, lastPx: [x, y] }
 	'offset' : 0,		// servertime - local time, in seconds
-	'poll' : 30,
+	'pollSeconds' : 30,
 	'layer' : null,
 	'routes' : null,		// <svg> with one polyline per revealed route
 	'document' : null,	// test hook; the browser's document when null
@@ -92,7 +92,7 @@ Game.mapObjects =
 
 	'setPollInterval' : function (seconds)
 	{
-		if (Game.mapObjects.pollTimer && Game.mapObjects.poll == seconds)
+		if (Game.mapObjects.pollTimer && Game.mapObjects.pollSeconds == seconds)
 		{
 			return;
 		}
@@ -102,7 +102,7 @@ Game.mapObjects =
 			clearInterval (Game.mapObjects.pollTimer);
 		}
 
-		Game.mapObjects.poll = seconds;
+		Game.mapObjects.pollSeconds = seconds;
 		Game.mapObjects.pollTimer = setInterval (Game.mapObjects.poll_, seconds * 1000);
 	},
 

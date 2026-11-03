@@ -235,3 +235,11 @@ test('an open label is closed when its object disappears', () => {
 	assert.strictEqual(a.label, null);
 	assert.strictEqual(label.removed, true);
 });
+
+test('setPollInterval keeps poll callable (the interval must not overwrite the function)', () => {
+	const a = loadWithDom();
+	a.setPollInterval(30);
+	assert.strictEqual(typeof a.poll, 'function');
+	assert.strictEqual(a.pollSeconds, 30);
+	a.poll();	// the call drawMapRegionCommit makes
+});
