@@ -69,6 +69,74 @@ div.minimap
 	border: 1px solid black;
 }
 
+/* Moving objects layer (armies in Dolumar), see javascript/mapobjects.js */
+div.mapobjects
+{
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 0;
+	height: 0;
+	overflow: visible;
+	z-index: 20;
+	pointer-events: none;
+}
+
+div.mapobjects svg.mapobjects-routes
+{
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+
+div.mapobjects div.mapobject
+{
+	position: absolute;
+	width: 40px;
+	height: 40px;
+	background-repeat: no-repeat;
+	background-position: 0 0;
+	pointer-events: auto;
+}
+
+div.mapobjects div.mapobject.facing-left
+{
+	background-position: -40px 0;
+}
+
+div.mapobjects div.mapobject.clickable
+{
+	cursor: pointer;
+}
+
+div.mapobjects div.mapobject-label
+{
+	position: absolute;
+	min-width: 120px;
+	padding: 4px 8px;
+	background: rgba(0, 0, 0, 0.8);
+	color: #fff;
+	font-size: 12px;
+	border-radius: 4px;
+	pointer-events: auto;
+	z-index: 21;
+}
+
+div.mapobjects div.mapobject-label p
+{
+	margin: 0 0 4px 0;
+}
+
+div.mapobjects div.mapobject-label a
+{
+	display: inline-block;
+	min-height: 32px;
+	line-height: 32px;
+	color: #ffd700;
+}
+
 /* Choosing a location in the mobile layout: Place/Cancel bar at the bottom of the map */
 #map_select_actions
 {

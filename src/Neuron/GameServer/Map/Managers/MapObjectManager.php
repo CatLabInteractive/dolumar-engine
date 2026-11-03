@@ -52,6 +52,28 @@ abstract class Neuron_GameServer_Map_Managers_MapObjectManager
 	}
 	
 	/**
+	*	Return the moving objects (armies in Dolumar, ...) that touch any of $areas.
+	*
+	*	Contract for games: an object the viewer is related to may be returned
+	*	whenever its route touches an area (the client draws the whole route).
+	*	An object the viewer is NOT related to must only be returned while its
+	*	current position is inside an area, otherwise the mere presence of the
+	*	object in the response tells the viewer something is heading their way.
+	*	Each object needs a stable getUOID(): the exporter derives the anonymous
+	*	id from it, so a changing id would recreate the sprite every poll.
+	*	$viewer is the player looking at the map (or null); games may use it
+	*	to decide what the object reveals (see MapObject::isRelatedTo).
+	*	Games that have no moving objects keep this default.
+	*
+	*	@param Neuron_GameServer_Map_Area[] $areas
+	*	@return Neuron_GameServer_Map_MapObject[]
+	*/
+	public function getMovingObjects (array $areas, $viewer = null)
+	{
+		return array ();
+	}
+
+	/**
 	*	Return all objects on one specific location
 	*/
 	public function getFromLocation (Neuron_GameServer_Map_Location $location)

@@ -358,6 +358,12 @@ Game.map =
 		
 		Game.map.oScrollMap.enableControls ();
 
+		// Moving objects (armies in Dolumar) live in their own layer on top of the regions
+		if (typeof (Game.mapObjects) != 'undefined')
+		{
+			Game.mapObjects.init ();
+		}
+
 		// Map scale: pinch is a mobile-layout feature; a pinch stores its result.
 		Game.map.oScrollMap.canPinch = function ()
 		{
@@ -504,6 +510,12 @@ Game.map =
 		
 		// Don't forget to clean the que
 		Game.map.aRegionsToLoad = new Array ();
+
+		// New regions on screen: refresh the moving objects for them
+		if (typeof (Game.mapObjects) != 'undefined')
+		{
+			Game.mapObjects.poll ();
+		}
 	},
 	
 	'isImageLoaded' : function (imgdetails)
