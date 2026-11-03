@@ -112,13 +112,13 @@ class OpenIDConnectTest extends TestCase
 		]);
 
 		$oidc = new Neuron_Auth_OpenIDConnect ($provider);
-		$url = $oidc->getAuthorizationUrl ();
+		$url = $oidc->getAuthorizationUrl (true);
 
 		parse_str ((string) parse_url ($url, PHP_URL_QUERY), $query);
 
 		$this->assertNotEmpty ($_SESSION['oidc_state']);
 		$this->assertSame ($_SESSION['oidc_state'], $query['state']);
-		$this->assertSame ('openid email profile', $query['scope']);
+		$this->assertSame ('openid email profile credits', $query['scope']);
 		$this->assertSame ('client', $query['client_id']);
 		$this->assertSame ('code', $query['response_type']);
 		$this->assertArrayNotHasKey ('approval_prompt', $query);
@@ -140,7 +140,27 @@ class OpenIDConnectTest extends TestCase
 			'email' => 'a@b.c',
 			'username' => 'p',
 			'verified_email' => true,
+			'access_token' => 'token',
 		], $profile);
+	}
+
+	public function test_scope_without_credits_is_unchanged (): void
+	{
+		$provider = new GenericProvider ([
+			'clientId' => 'client',
+			'clientSecret' => 'secret',
+			'redirectUri' => 'https://game.example.test/oauth2/login/next',
+			'urlAuthorize' => 'https://accounts.example.test/oauth2/authorize',
+			'urlAccessToken' => 'https://accounts.example.test/oauth2/token',
+			'urlResourceOwnerDetails' => 'https://accounts.example.test/oauth2/me',
+		]);
+
+		$url = (new Neuron_Auth_OpenIDConnect ($provider))->getAuthorizationUrl (false);
+		parse_str ((string) parse_url ($url, PHP_URL_QUERY), $query);
+
+		$this->assertSame ('openid email profile', $query['scope']);
+		$this->assertSame ('openid email profile', Neuron_Auth_OpenIDConnect::requestedScope (false));
+		$this->assertSame ('openid email profile credits', Neuron_Auth_OpenIDConnect::requestedScope (true));
 	}
 
 	public function test_open_id_url_uses_prefix (): void

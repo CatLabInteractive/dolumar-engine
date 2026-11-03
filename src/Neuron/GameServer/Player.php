@@ -1151,9 +1151,32 @@ class Neuron_GameServer_Player
         return $this->objCredits->refundCredits ($amount, $description, $action);
     }
 
+    /**
+     * Apply a paid credit action. Return false when it can no longer be
+     * applied; the purchase is then refunded. (No native return type so
+     * existing overrides stay compatible; they must return bool.)
+     *
+     * @return bool
+     */
     public function useCredit ($amount, $data)
     {
         $this->extendPremiumAccount (60*60*24*15);
+        return true;
+    }
+
+    /**
+     * Server-side price for a credit action; null when invalid.
+     *
+     * @return array{credits:int, description:string}|null
+     */
+    public function quoteCreditAction (array $data): ?array
+    {
+        $action = $data['action'] ?? '';
+        if ($action === '' || $action === 'premium')
+        {
+            return ['credits' => (int) PREMIUM_COST_CREDITS, 'description' => 'Premium account (15 days)'];
+        }
+        return null;
     }
 
     public function getCreditUseUrl ($amount = 100, $data = array (), $description = 'Premium membership')
@@ -1188,15 +1211,6 @@ class Neuron_GameServer_Player
     {
         $this->loadCredits ();
         return $this->objCredits->getTrackerUrl ($tracker);
-    }
-
-    public function handleUseRequest ($data, $id, $key)
-    {
-        $this->loadCredits ();
-        $result = $this->objCredits->handleUseRequest ($data, $id, $key);
-        $this->error = $this->objCredits->getError ();
-
-        return $result;
     }
 
     /*
