@@ -203,6 +203,44 @@ Game.minimap =
 		}
 	},
 	
+	/*
+		Fit the minimap viewer to its element again, centred on the viewport box. Needed when
+		the minimap was created inside a hidden panel (0 by 0, so it drew no tiles) and is
+		shown later, as the mobile layout does.
+	*/
+	'refreshSize' : function ()
+	{
+		var viewer = Game.minimap.oScrollMap;
+		var div = $('minimap_real');
+
+		if (viewer == null || !div)
+		{
+			return;
+		}
+
+		var w = div.offsetWidth;
+		var h = div.offsetHeight;
+
+		if (w <= 0 || h <= 0)
+		{
+			return;
+		}
+
+		viewer.resize (w, h);
+
+		var vp = $('minimapViewport');
+		if (vp)
+		{
+			var cx = parseInt (vp.style.left) + parseInt (vp.style.width) / 2;
+			var cy = parseInt (vp.style.top) + parseInt (vp.style.height) / 2;
+
+			if (!isNaN (cx) && !isNaN (cy))
+			{
+				viewer.jumpTo (-cx, -cy, true);
+			}
+		}
+	},
+
 	'zoomIn' : function ()
 	{
 		Game.minimap.iZoom += 0.25;

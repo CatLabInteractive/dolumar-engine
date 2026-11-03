@@ -123,7 +123,7 @@ TiledImageViewer.prototype.getScale = function () {
     Scale the map to s (clamped to [0.5, 1.5]), keeping the map point under
     the centre of the view at the centre.
  */
-TiledImageViewer.prototype.setScale = function (s) {
+TiledImageViewer.prototype.setScale = function (s, deferTiles) {
     s = parseFloat(s);
     if (isNaN(s)) {
         return;
@@ -150,10 +150,39 @@ TiledImageViewer.prototype.setScale = function (s) {
     this.div.style.top = nY + 'px';
 
     // Recalculate the number of tiles to show; this also draws the visible tiles.
-    this.resize();
+    // During a pinch (deferTiles) that happens at most every TIV_PINCH_TILE_MS and once
+    // more when the pinch ends, instead of on every touchmove.
+    if (deferTiles) {
+        this.scheduleTileUpdate();
+    } else {
+        this.cancelTileUpdate();
+        this.resize();
+    }
 
     if (typeof(this.onscroll) != 'undefined') {
         this.onscroll(-nX / s, -nY / s, 0, 0);
+    }
+}
+
+var TIV_PINCH_TILE_MS = 250;
+
+TiledImageViewer.prototype.scheduleTileUpdate = function () {
+    var self = this;
+
+    if (this.tileUpdateTimer) {
+        return;
+    }
+
+    this.tileUpdateTimer = setTimeout(function () {
+        self.tileUpdateTimer = null;
+        self.resize();
+    }, TIV_PINCH_TILE_MS);
+}
+
+TiledImageViewer.prototype.cancelTileUpdate = function () {
+    if (this.tileUpdateTimer) {
+        clearTimeout(this.tileUpdateTimer);
+        this.tileUpdateTimer = null;
     }
 }
 
@@ -778,10 +807,16 @@ function TIV_touchBegin(e, self) {
 
 function TIV_touchEnd(e) {
     var o = this._TIV_obj;
-    var tap = !o.pinching && o.dragging && TIV_isTap(o, e);
+    // A gesture the system took over (touchcancel) is never a tap.
+    var tap = !o.pinching && o.dragging && !(e && e.type === 'touchcancel') && TIV_isTap(o, e);
 
     if (o.pinching && (!e || !e.touches || e.touches.length < 2)) {
         o.pinching = false;
+
+        // Load the tiles for the final scale now.
+        o.cancelTileUpdate();
+        o.resize();
+
         if (typeof(o.onscale) == 'function') {
             o.onscale(o.getScale());
         }
@@ -877,7 +912,7 @@ function TIV_pinchMove(e) {
         return false;
     }
 
-    o.setScale(o.pinchStartScale * (TIV_touchDistance(e) / o.pinchStartDistance));
+    o.setScale(o.pinchStartScale * (TIV_touchDistance(e) / o.pinchStartDistance), true);
 
     if (e.preventDefault) e.preventDefault();
     return false;

@@ -54,7 +54,7 @@ of the tile size the server renders; `Game.map.setScale` stores it in `localStor
 for the `auto` breakpoint. The map cancels the default action of `touchstart` so the page never scrolls behind it,
 which also stops browsers from turning a tap into a click; `TIV_touchEnd` therefore dispatches a click itself for a
 clean tap (one finger, under 10 px of movement, under 500 ms) so image-map areas and movable objects open as on
-desktop. The game supplies its own mobile chrome (header, tab bar) on top of these primitives.
+desktop. The game supplies its own mobile chrome (header, tab bar) on top of these primitives. Hooks for it: `Game.gui.newsflashHost(oWindow)` returns another element for a newsflash to scroll over (when the game hides the panel it belongs to), and `Game.minimap.refreshSize()` sizes a minimap that was created inside a hidden panel. `auto` only applies the half-scale viewport on touch-first devices (`(hover: none) and (pointer: coarse)`): desktop browsers ignore the viewport meta, so a touchscreen laptop must not get the width correction.
 
 ## Browser (Web Push) notifications
 

@@ -134,9 +134,13 @@ Game.map =
 		if (vp)
 		{
 			var sizes = Game.core.getWindowSize ();
+
+			// A scaled map (mobile layout) shows 1 / scale times the area.
+			var scale = Game.map.oScrollMap ? Game.map.oScrollMap.getScale () : 1;
+			Game.map.nMinimapViewportScale = scale;
 	
-			var sx = Math.floor(sizes[0] / Game.map.nMinimapRatioX);
-			var sy = Math.floor(sizes[1] / Game.map.nMinimapRatioY);
+			var sx = Math.floor(sizes[0] / scale / Game.map.nMinimapRatioX);
+			var sy = Math.floor(sizes[1] / scale / Game.map.nMinimapRatioY);
 		
 			sx *= Game.minimap.iZoom;
 			sy *= Game.minimap.iZoom;
@@ -1072,6 +1076,11 @@ Game.map =
 	// Is called on every move, recenter the minimap
 	'recenterMinimap' : function (x, y)
 	{
+		// The map scale changed (pinch, zoom buttons): the viewport box changes size too.
+		if (Game.map.oScrollMap != null && Game.map.oScrollMap.getScale () !== Game.map.nMinimapViewportScale)
+		{
+			Game.map.rescaleMinimapViewport ();
+		}
 		if (typeof (x) == 'undefined' && typeof (y) == 'undefined')
 		{
 			if (typeof(Game.map.oScrollMap) != 'undefined' && Game.map.oScrollMap != null)

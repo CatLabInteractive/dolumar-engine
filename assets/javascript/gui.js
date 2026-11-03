@@ -838,8 +838,20 @@ Game.gui =
 		}
 	},
 	
+	/*
+		Optional hook: newsflashHost (oWindow) returns the element a newsflash scrolls
+		over instead of the window's own div (for a game that hides that panel), or null.
+	*/
+	'newsflashHost' : null,
+
 	'showNewsflash' : function (oWindow, content)
 	{
+		var host = (typeof (Game.gui.newsflashHost) == 'function') ? Game.gui.newsflashHost (oWindow) : null;
+		if (host)
+		{
+			oWindow = { 'div' : $(host) };
+		}
+
 		// Make a nice little div on top of the elemnt
 		var newsdiv = $(document.createElement ('div'));
 		
@@ -992,6 +1004,7 @@ Game.gui =
 			settings = {
 				className:	Game.gui.sGuiTheme, 
 				title: 		title, 
+				id: 		Game.gui.nextWindowId (), 
 				width: 		parseInt(width),
 				height: 	parseInt(height), 
 				
@@ -1170,6 +1183,19 @@ Game.gui =
 		aOpenWindows with the same dialog ids, so polling is unaffected.
 		Panels and invisible windows (no oWindow, no oSheet) are left alone.
 	*/
+	/*
+		A DOM id for a new Prototype window. Without one, window.js uses "window_" plus the
+		current time in milliseconds, which repeats when several windows are created in the
+		same millisecond (relayoutWindows does exactly that).
+	*/
+	'iWindowCounter' : 0,
+
+	'nextWindowId' : function ()
+	{
+		Game.gui.iWindowCounter ++;
+		return 'gamewindow_' + Game.gui.iWindowCounter;
+	},
+
 	'relayoutWindows' : function (mode)
 	{
 		var windows = Game.gui.aOpenWindows;
@@ -1185,6 +1211,19 @@ Game.gui =
 			else if (mode == 'desktop' && entry.oSheet)
 			{
 				Game.gui.sheetToWindow (entry);
+			}
+		}
+
+		// Sheets that are not windows (sheetMessage confirms) know how to move themselves.
+		if (mode == 'desktop')
+		{
+			var sheets = Game.sheets.stack.slice ();
+			for (var j = 0; j < sheets.length; j ++)
+			{
+				if (typeof (sheets[j].toDesktop) == 'function')
+				{
+					sheets[j].toDesktop ();
+				}
 			}
 		}
 
@@ -1237,7 +1276,9 @@ Game.gui =
 		win.options.onDestroy = null;
 		if (win.modal)
 		{
-			// Drop the modal overlay; destroy () alone leaves it behind.
+			// Drop the modal overlay; destroy () alone leaves it behind. With destroyOnClose
+			// the hide effect would destroy the window as well, and a second destroy throws.
+			win.options.destroyOnClose = false;
 			win.doNotNotifyHide = true;
 			win.hide ();
 		}
@@ -1249,6 +1290,8 @@ Game.gui =
 
 	'sheetToWindow' : function (entry)
 	{
+		entry.settings.id = Game.gui.nextWindowId ();
+
 		var win = new Window (entry.settings);
 
 		if (entry.className)
@@ -1585,6 +1628,13 @@ Game.gui =
 		
 		oSheet.content.appendChild (message);
 		oSheet.content.appendChild (actions);
+
+		// Layout back to desktop (relayoutWindows): the same question as a desktop dialog.
+		oSheet.toDesktop = function ()
+		{
+			Game.sheets.close (oSheet);
+			Game.gui.dialogMessage (null, sText, sLabelOne, fActionOne, sLabelTwo, fActionTwo);
+		};
 	},
 	
 	'confirmAction' : function (sText)
@@ -1970,7 +2020,7 @@ Game.gui =
 					increasing.maximum = 0;
 				}
 				
-				increasing.title = null;
+				increasing.removeAttribute ('title');
 			}
 			
 			var timepassed = (now.getTime() - increasing.startdate) / 1000;
