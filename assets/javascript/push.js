@@ -233,7 +233,8 @@ Game.push = {
 		var show = function (state, canEnable, canDisable)
 		{
 			status.innerHTML = '';
-			status.appendChild (document.createTextNode (status.getAttribute ('data-' + state)));
+			var label = container.getElementsByClassName ('push-text-' + state)[0];
+			status.appendChild (document.createTextNode (label ? (label.textContent || label.innerText) : state));
 			status.style.display = '';
 			enable.style.display = canEnable ? '' : 'none';
 			disable.style.display = canDisable ? '' : 'none';

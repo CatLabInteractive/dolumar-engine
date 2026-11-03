@@ -729,8 +729,16 @@ class Neuron_GameServer_Player
 
     protected function getPushTitle ()
     {
+        $game = defined ('GAME_NAME') ? GAME_NAME : 'Dolumar';
         $name = Neuron_GameServer_Server::getInstance ()->getServerName ();
-        return $name ? 'Dolumar ' . $name : 'Dolumar';
+
+        if (!$name)
+        {
+            return $game;
+        }
+
+        // Server names are often "Dolumar" or "Dolumar 2" already.
+        return stripos ($name, $game) === false ? $game . ' ' . $name : $name;
     }
 
     /*

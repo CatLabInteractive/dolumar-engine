@@ -526,7 +526,7 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			}
 			$me->setPushMuted ($muted);
 
-			return $this->reloadWindow ();
+			return $this->updateContent ($this->showMyAccount ());
 		}
 
 		return $this->updateContent ($this->showMyAccount ());
