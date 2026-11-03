@@ -40,7 +40,10 @@ or `body.layout-desktop`. `auto` switches at a width of 800 CSS pixels. In mobil
 draggable windows; `Game.gui.relayoutWindows(mode)` moves open windows between the two presentations. The map
 scale in `assets/javascript/scrollmap.js` is a client-side CSS scale (0.5 to 1.5, pinch or buttons) applied on top
 of the tile size the server renders; `Game.map.setScale` stores it in `localStorage` and corrects the width used
-for the `auto` breakpoint. The game supplies its own mobile chrome (header, tab bar) on top of these primitives.
+for the `auto` breakpoint. The map cancels the default action of `touchstart` so the page never scrolls behind it,
+which also stops browsers from turning a tap into a click; `TIV_touchEnd` therefore dispatches a click itself for a
+clean tap (one finger, under 10 px of movement, under 500 ms) so image-map areas and movable objects open as on
+desktop. The game supplies its own mobile chrome (header, tab bar) on top of these primitives.
 
 ## Configuration
 
