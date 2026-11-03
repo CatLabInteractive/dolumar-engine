@@ -620,33 +620,8 @@ class Neuron_GameServer_Player
         // Add "actor" to inputdata
         $inputData['actor'] = $this;
 
-        $newArray = array ();
-        $plainArray = array ();
-        foreach ($inputData as $k => $v)
-        {
-            if ($v instanceof Neuron_GameServer_Interfaces_Logable)
-            {
-                $newArray[$k] = Neuron_Core_Tools::output_varchar ($v->getName ());
-                $plainArray[$k] = $v->getName ();
-            }
-            else
-            {
-                $newArray[$k] = Neuron_Core_Tools::output_varchar ($v);
-                $plainArray[$k] = $v;
-            }
-        }
-
-        $msg = Neuron_Core_Tools::putIntoText
-        (
-            $text->get ($txtMsgKey, $txtMsgSection, 'notifications'),
-            $newArray
-        );
-
-        $msg_plaintext = Neuron_Core_Tools::putIntoText
-        (
-            $text->get ($txtMsgKey, $txtMsgSection, 'notifications'),
-            $plainArray
-        );
+        $msg = $this->getNotificationText ($text, $txtMsgKey, $txtMsgSection, $inputData, true);
+        $msg_plaintext = $this->getNotificationText ($text, $txtMsgKey, $txtMsgSection, $inputData, false);
 
         // Notify player gametrigger
         //$this->callGameTrigger ('sendNotification', array ($msg, $txtMsgSection, $txtMsgKey, $inputData));
@@ -664,6 +639,141 @@ class Neuron_GameServer_Player
         } catch (Exception $e) {
             Neuron_ErrorHandler_Handler::getInstance()->notify($e);
         }
+
+        // And a browser notification. Public messages are written for other players' feeds.
+        if (!$isPublic)
+        {
+            try {
+                $this->queuePushNotification ($msg_plaintext, $txtMsgSection, $txtMsgSection . '-' . $txtMsgKey);
+            } catch (Exception $e) {
+                Neuron_ErrorHandler_Handler::getInstance()->notify($e);
+            }
+        }
+    }
+
+    /*
+        Render a message from the "notifications" language file.
+        $html escapes the values; the plain text version is for e-mail and push.
+    */
+    private function getNotificationText ($text, $txtMsgKey, $txtMsgSection, $inputData, $html)
+    {
+        $values = array ();
+        foreach ($inputData as $k => $v)
+        {
+            if ($v instanceof Neuron_GameServer_Interfaces_Logable)
+            {
+                $values[$k] = $html ? Neuron_Core_Tools::output_varchar ($v->getName ()) : $v->getName ();
+            }
+            else
+            {
+                $values[$k] = $html ? Neuron_Core_Tools::output_varchar ($v) : $v;
+            }
+        }
+
+        return Neuron_Core_Tools::putIntoText
+        (
+            $text->get ($txtMsgKey, $txtMsgSection, 'notifications'),
+            $values
+        );
+    }
+
+    /*
+        Send only a browser notification (no e-mail), for events that would be
+        too frequent for e-mail, such as a finished building.
+        The message comes from the "notifications" language file, like sendNotification.
+    */
+    public function sendPushNotification ($txtMsgKey, $txtMsgSection, $inputData = array (), $tag = null)
+    {
+        $text = $this->getRightLanguage ();
+
+        $inputData['actor'] = $this;
+
+        $msg = $this->getNotificationText ($text, $txtMsgKey, $txtMsgSection, $inputData, false);
+
+        return $this->queuePushNotification ($msg, $txtMsgSection, $tag);
+    }
+
+    /*
+        Queue a browser notification for this player's subscribed browsers.
+        The cron job delivers it (Neuron_GameServer_Push_Sender::flushQueue).
+        @return bool true when queued.
+    */
+    public function queuePushNotification ($message, $category, $tag = null, $url = null)
+    {
+        if (!Neuron_GameServer_Push_Config::isEnabled () || !$this->isPushCategoryEnabled ($category))
+        {
+            return false;
+        }
+
+        $mapper = Neuron_GameServer_Mappers_PushMapper::getInstance ();
+        if (!$mapper->hasSubscriptions ($this->getId ()))
+        {
+            return false;
+        }
+
+        $mapper->enqueue
+        (
+            $this->getId (),
+            Neuron_GameServer_Push_Sender::buildPayload
+            (
+                $this->getPushTitle (),
+                $message,
+                $url === null ? ABSOLUTE_URL : $url,
+                $tag,
+                defined ('PUSH_ICON_URL') ? PUSH_ICON_URL : null
+            )
+        );
+
+        return true;
+    }
+
+    protected function getPushTitle ()
+    {
+        $name = Neuron_GameServer_Server::getInstance ()->getServerName ();
+        return $name ? 'Dolumar ' . $name : 'Dolumar';
+    }
+
+    /*
+        The notification categories ("notifications" language file sections) a player
+        can switch off, as section => label. Games override this.
+    */
+    public function getPushCategories ()
+    {
+        return array ();
+    }
+
+    /*
+        Categories that are off until the player switches them on. Games override this.
+    */
+    public function getPushDefaultMuted ()
+    {
+        return array ();
+    }
+
+    /*
+        @return string[] the muted categories.
+    */
+    public function getPushMuted ()
+    {
+        $stored = $this->getPreference ('pushMuted', null);
+        if (!is_string ($stored))
+        {
+            return $this->getPushDefaultMuted ();
+        }
+
+        return $stored === '' ? array () : explode (',', $stored);
+    }
+
+    public function setPushMuted (array $muted)
+    {
+        $known = array_keys ($this->getPushCategories ());
+        $muted = array_values (array_intersect ($known, $muted));
+        $this->setPreference ('pushMuted', implode (',', $muted));
+    }
+
+    public function isPushCategoryEnabled ($category)
+    {
+        return !in_array ($category, $this->getPushMuted (), true);
     }
 
     private function sendNotificationEmail ($msg_plaintext, $txtMsgKey, $txtMsgSection, $inputData, $objSender, $isPublic)

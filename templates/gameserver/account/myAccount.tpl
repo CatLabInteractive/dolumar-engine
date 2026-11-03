@@ -40,6 +40,40 @@
 	</select>
 </form>
 
+<?php if (!empty ($push)) { ?>
+	<h2><?=$this->getText ('push')?></h2>
+	<div class="push-settings">
+		<p class="push-intro"><?=$this->getText ('pushIntro')?></p>
+		<p class="push-status" style="display: none;"
+			data-on="<?=htmlspecialchars ($this->getText ('pushOn'))?>"
+			data-off="<?=htmlspecialchars ($this->getText ('pushOff'))?>"
+			data-blocked="<?=htmlspecialchars ($this->getText ('pushBlocked'))?>"
+			data-unsupported="<?=htmlspecialchars ($this->getText ('pushUnsupported'))?>"
+			data-ios="<?=htmlspecialchars ($this->getText ('pushIos'))?>"><?=$this->getText ('pushOff')?></p>
+		<p>
+			<button type="button" class="push-enable" style="display: none;" onclick="Game.push.enable(this); return false;"><?=$this->getText ('pushEnable')?></button>
+			<button type="button" class="push-disable" style="display: none;" onclick="Game.push.disable(this); return false;"><?=$this->getText ('pushDisable')?></button>
+		</p>
+
+		<?php if (!empty ($pushCategories)) { ?>
+			<form onsubmit="submitForm(this, {'action':'push'}); return false;">
+				<p><?=$this->getText ('pushCategories')?></p>
+				<ul>
+					<?php foreach ($pushCategories as $category) { ?>
+						<li>
+							<label>
+								<input type="checkbox" name="push_<?=htmlspecialchars ($category['id'])?>" value="1"<?php if ($category['enabled']) { echo ' checked="checked"'; } ?> />
+								<?=htmlspecialchars ($category['label'])?>
+							</label>
+						</li>
+					<?php } ?>
+				</ul>
+				<p><button type="submit"><?=$this->getText ('pushSave')?></button></p>
+			</form>
+		<?php } ?>
+	</div>
+<?php } ?>
+
 <ul style="margin-top: 8px;">
 	<li>
 		&raquo; <a href="<?=ABSOLUTE_URL?>?logout=true"><?=$logout?></a>
