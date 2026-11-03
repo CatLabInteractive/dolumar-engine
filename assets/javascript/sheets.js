@@ -8,6 +8,10 @@
 
 	Markup: div#sheets > div.sheet[data-dialog-id] > div.sheet-bar
 	(button.sheet-back, span.sheet-title, button.sheet-close) + div.sheet-content.
+	A title that ends in a parenthesised part, "Build (My village)", is shown as the
+	title with the part in parentheses as a small.sheet-subtitle. Back is only shown
+	when there is a sheet underneath to go back to.
+	Game.sheets.observe (fn) calls fn after every change of the stack.
 	Needs Prototype; loaded after gui.js.
 */
 if (typeof Game == 'undefined')
@@ -18,6 +22,15 @@ if (typeof Game == 'undefined')
 Game.sheets = {
 
 	stack : [],
+	observers : [],
+
+	/*
+		Called (without arguments) after every open, close or focus.
+	*/
+	'observe' : function (callback)
+	{
+		Game.sheets.observers.push (callback);
+	},
 
 	'container' : function ()
 	{
@@ -67,7 +80,7 @@ Game.sheets = {
 		back.update ('&#8249;');
 
 		var title = new Element ('span', { 'class' : 'sheet-title' });
-		title.update (options.title ? options.title : '');
+		Game.sheets.setTitle (title, options.title ? options.title : '');
 
 		var close = new Element ('button', { 'type' : 'button', 'class' : 'sheet-close', 'aria-label' : 'Close' });
 		close.update ('&#215;');
@@ -96,6 +109,7 @@ Game.sheets = {
 		var sheet = {
 			'element' : element,
 			'content' : content,
+			'back' : back,
 			'dialogId' : (typeof (options.dialogId) != 'undefined') ? options.dialogId : null,
 			'modal' : modal,
 			'closable' : closable,
@@ -127,6 +141,26 @@ Game.sheets = {
 		Game.sheets.update ();
 
 		return sheet;
+	},
+
+	/*
+		Title text into the title element: a trailing "(...)" becomes the subtitle.
+	*/
+	'setTitle' : function (element, text)
+	{
+		var match = String (text).match (/^(.*\S)\s*\(([^()]+)\)$/);
+
+		element.update ('');
+
+		if (match)
+		{
+			element.appendChild (new Element ('span', { 'class' : 'sheet-title-text' }).update (match[1]));
+			element.appendChild (new Element ('small', { 'class' : 'sheet-subtitle' }).update (match[2]));
+		}
+		else
+		{
+			element.update (text);
+		}
 	},
 
 	/*
@@ -204,6 +238,7 @@ Game.sheets = {
 
 	/*
 		Only the top non-modal sheet is visible; modal sheets always are.
+		Back is shown on a sheet with a non-modal sheet underneath it.
 	*/
 	'update' : function ()
 	{
@@ -219,6 +254,7 @@ Game.sheets = {
 			}
 		}
 
+		var below = 0;
 		for (var j = 0; j < stack.length; j ++)
 		{
 			if (stack[j].modal || stack[j] === top)
@@ -228,6 +264,62 @@ Game.sheets = {
 			else
 			{
 				stack[j].element.hide ();
+			}
+
+			if (stack[j].closable)
+			{
+				if (below > 0)
+				{
+					stack[j].back.show ();
+				}
+				else
+				{
+					stack[j].back.hide ();
+				}
+			}
+
+			if (!stack[j].modal)
+			{
+				below ++;
+			}
+		}
+
+		for (var k = 0; k < Game.sheets.observers.length; k ++)
+		{
+			Game.sheets.observers[k] ();
+		}
+	},
+
+	/*
+		The top non-modal sheet, or null.
+	*/
+	'top' : function ()
+	{
+		var stack = Game.sheets.stack;
+
+		for (var i = stack.length - 1; i >= 0; i --)
+		{
+			if (!stack[i].modal)
+			{
+				return stack[i];
+			}
+		}
+
+		return null;
+	},
+
+	/*
+		Dismiss every non-modal sheet (a tab bar tap starts a fresh stack).
+	*/
+	'dismissAll' : function ()
+	{
+		var sheets = Game.sheets.stack.slice ();
+
+		for (var i = sheets.length - 1; i >= 0; i --)
+		{
+			if (!sheets[i].modal)
+			{
+				Game.sheets.dismiss (sheets[i]);
 			}
 		}
 	},
