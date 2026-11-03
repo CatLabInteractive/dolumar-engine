@@ -35,7 +35,9 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 	private $poll;
 
 	/**
-	* @param string $secret per-deploy salt for anonymous ids
+	* @param string $secret per-deploy key for anonymous ids; when empty,
+	*	objects an unrelated viewer may not identify are not sent at all
+	*	(an unkeyed id could be reversed by enumerating the real ids)
 	* @param int $poll client poll interval in seconds
 	*/
 	public function __construct ($secret, $poll = 30)
@@ -59,7 +61,11 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 		{
 			try
 			{
-				$out[] = $this->exportObject ($object, $viewer, $now);
+				$data = $this->exportObject ($object, $viewer, $now);
+				if ($data !== null)
+				{
+					$out[] = $data;
+				}
 			}
 			catch (Throwable $e)
 			{
@@ -87,13 +93,18 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 	*/
 	public function anonymousId ($uoid)
 	{
-		return 'a:' . substr (sha1 ($this->secret . $uoid), 0, 12);
+		return 'a:' . substr (hash_hmac ('sha256', $uoid, $this->secret), 0, 12);
 	}
 
 	private function exportObject (Neuron_GameServer_Map_MapObject $object, $viewer, $now)
 	{
-		$location = $object->getLocation ($now);
 		$related = $object->isRelatedTo ($viewer);
+		if (!$related && $this->secret === '')
+		{
+			return null;
+		}
+
+		$location = $object->getLocation ($now);
 		$display = $related ? $object->getDisplayObject () : $object->getNeutralDisplayObject ();
 
 		$data = array

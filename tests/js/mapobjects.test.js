@@ -11,6 +11,7 @@ function load() {
 		Game: {
 			map: {
 				getOrthogonalCors: (gx, gy) => [Math.round((gx - gy) * 32), Math.round((gx + gy) * 16)],
+				getURL: (base, query) => base + '?' + query,
 				oScrollMap: null,
 				iTilesPerRegion: 10,
 			},
@@ -20,12 +21,16 @@ function load() {
 		console,
 		setInterval: () => 0,
 		clearInterval: () => {},
+		setTimeout: (fn) => { ctx.timeouts.push(fn); return ctx.timeouts.length; },
+		clearTimeout: () => {},
+		timeouts: [],
 		document: null,
 		Date,
 		Math,
 	};
 	vm.createContext(ctx);
 	vm.runInContext(fs.readFileSync(path.join(__dirname, '../../assets/javascript/mapobjects.js'), 'utf8'), ctx);
+	ctx.Game.mapObjects.ctx = ctx;	// test access to the stubbed globals
 	return ctx.Game.mapObjects;
 }
 
@@ -174,4 +179,59 @@ test('drawRoutes draws SVG polylines instead of sizing a canvas to the whole rou
 	a.objects = {};
 	a.drawRoutes();
 	assert.strictEqual(a.routes.children.length, 0, 'redraw clears old lines');
+});
+
+function scrollMapWithTiles() {
+	return { div: null, loadedMapTiles: { '0|0': [0, 0] } };
+}
+
+test('poll is debounced: several region commits in a row make one request', () => {
+	const a = loadWithDom();
+	let requests = 0;
+	a.request = () => { requests ++; };
+	a.scrollMap = scrollMapWithTiles;
+	a.poll(); a.poll(); a.poll();
+	assert.strictEqual(requests, 0, 'nothing sent yet');
+	const pending = a.ctx.timeouts;
+	assert.strictEqual(pending.length, 1, 'one timer scheduled');
+	pending[0]();
+	assert.strictEqual(requests, 1);
+});
+
+test('a response that arrives after a newer request is ignored', () => {
+	const a = loadWithDom();
+	a.scrollMap = scrollMapWithTiles;
+	a.createSprite = () => ({ style: {}, className: '' });
+	a.removeSprite = () => {};
+	const handlers = [];
+	a.request = (url, body, onSuccess) => { handlers.push(onSuccess); };
+	a.poll_(); a.poll_();
+	handlers[1]({ servertime: 2, poll: 30, objects: [{ id: 'new', kind: 'neutral', x: 0, y: 0, paths: [] }] });
+	handlers[0]({ servertime: 1, poll: 30, objects: [{ id: 'old', kind: 'neutral', x: 0, y: 0, paths: [] }] });
+	assert.deepStrictEqual(Object.keys(a.objects), ['new']);
+});
+
+test('no request while the page is hidden', () => {
+	const a = loadWithDom();
+	a.document.hidden = true;
+	a.scrollMap = scrollMapWithTiles;
+	let requests = 0;
+	a.request = () => { requests ++; };
+	a.poll_();
+	assert.strictEqual(requests, 0);
+});
+
+test('an open label is closed when its object disappears', () => {
+	const a = loadWithDom();
+	a.layer = a.document.createElement('div');
+	a.createSprite = () => ({ style: {}, className: '', parentNode: null });
+	a.removeSprite = (s) => { s.removed = true; };
+	a.updateSprite = () => {};
+	a.setObjects({ servertime: 1, poll: 30, objects: [{ id: 'b:1', kind: 'attack', x: 0, y: 0, paths: [] }] });
+	const label = a.document.createElement('div');
+	label.setAttribute('data-id', 'b:1');
+	a.label = label;
+	a.setObjects({ servertime: 2, poll: 30, objects: [] });
+	assert.strictEqual(a.label, null);
+	assert.strictEqual(label.removed, true);
 });

@@ -21,6 +21,8 @@ Game.mapObjects =
 	'label' : null,
 	'tickTimer' : null,
 	'pollTimer' : null,
+	'pollDebounce' : null,	// timer of a poll() waiting to run
+	'seq' : 0,			// number of the latest request; older answers are ignored
 	'kindText' : {},	// filled by the game template: kind -> translated text
 
 	'now' : function ()
@@ -36,6 +38,11 @@ Game.mapObjects =
 	'doc' : function ()
 	{
 		return Game.mapObjects.document || document;
+	},
+
+	'scrollMap' : function ()
+	{
+		return Game.map.oScrollMap;
 	},
 
 	/* Setup: called once the TiledImageViewer exists */
@@ -99,20 +106,51 @@ Game.mapObjects =
 		Game.mapObjects.pollTimer = setInterval (Game.mapObjects.poll_, seconds * 1000);
 	},
 
-	/* Ask the server for the objects touching the loaded regions */
+	/*
+		Ask the server for the objects touching the loaded regions. Region
+		commits come in bursts (drag end, jump, resize), so the request is
+		debounced a little.
+	*/
 	'poll' : function ()
 	{
-		Game.mapObjects.poll_ ();
-	},
-
-	'poll_' : function ()
-	{
-		if (!Game.map.oScrollMap)
+		if (Game.mapObjects.pollDebounce)
 		{
 			return;
 		}
 
-		var tiles = Game.map.oScrollMap.loadedMapTiles;
+		Game.mapObjects.pollDebounce = setTimeout (function ()
+		{
+			Game.mapObjects.pollDebounce = null;
+			Game.mapObjects.poll_ ();
+		}, 100);
+	},
+
+	/* The HTTP call, separated so it can be stubbed */
+	'request' : function (url, body, onSuccess)
+	{
+		new Ajax.Request
+		(
+			url,
+			{
+				method : 'post',
+				postBody : body,
+				onSuccess : function (transport)
+				{
+					onSuccess (transport.responseJSON);
+				}
+			}
+		);
+	},
+
+	'poll_' : function ()
+	{
+		var scrollMap = Game.mapObjects.scrollMap ();
+		if (!scrollMap || Game.mapObjects.doc ().hidden)
+		{
+			return;
+		}
+
+		var tiles = scrollMap.loadedMapTiles;
 		var sPost = '';
 		var i = 0;
 		for (var key in tiles)
@@ -127,23 +165,27 @@ Game.mapObjects =
 			return;
 		}
 
-		new Ajax.Request
+		var seq = ++ Game.mapObjects.seq;
+
+		Game.mapObjects.request
 		(
 			Game.map.getURL
 			(
 				CONFIG_DISPATCH_URL + 'map/objects/',
 				'tiles=' + Game.map.iTilesPerRegion + (Game.core.sSessionId != null ? '&session_id=' + Game.core.sSessionId : '')
 			),
+			sPost,
+			function (json)
 			{
-				method : 'post',
-				postBody : sPost,
-				onSuccess : function (transport)
+				// A slower, older answer must not overwrite a newer one
+				if (seq != Game.mapObjects.seq)
 				{
-					var json = transport.responseJSON;
-					if (json && typeof (json.servertime) != 'undefined')
-					{
-						Game.mapObjects.setObjects (json);
-					}
+					return;
+				}
+
+				if (json && typeof (json.servertime) != 'undefined')
+				{
+					Game.mapObjects.setObjects (json);
 				}
 			}
 		);
@@ -188,6 +230,13 @@ Game.mapObjects =
 				Game.mapObjects.removeSprite (Game.mapObjects.objects[id].sprite);
 				delete Game.mapObjects.objects[id];
 			}
+		}
+
+		// An open label for an object that is gone
+		if (Game.mapObjects.label && !seen[Game.mapObjects.label.getAttribute ('data-id')])
+		{
+			Game.mapObjects.removeSprite (Game.mapObjects.label);
+			Game.mapObjects.label = null;
 		}
 
 		Game.mapObjects.drawRoutes ();
