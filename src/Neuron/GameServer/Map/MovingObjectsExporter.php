@@ -67,6 +67,13 @@ class Neuron_GameServer_Map_MovingObjectsExporter
 			}
 		}
 
+		// Sort by the exported id so the order says nothing about how the
+		// game grouped its objects (e.g. all battles first, then squads).
+		usort ($out, function ($a, $b)
+		{
+			return strcmp ($a['id'], $b['id']);
+		});
+
 		return array
 		(
 			'servertime' => $now,

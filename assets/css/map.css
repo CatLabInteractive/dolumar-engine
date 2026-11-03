@@ -82,9 +82,12 @@ div.mapobjects
 	pointer-events: none;
 }
 
-div.mapobjects canvas.mapobjects-routes
+div.mapobjects svg.mapobjects-routes
 {
 	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: visible;
 	pointer-events: none;
 }
 
@@ -132,6 +135,7 @@ div.mapobjects div.mapobject-label a
 	min-height: 32px;
 	line-height: 32px;
 	color: #ffd700;
+}
 
 /* Choosing a location in the mobile layout: Place/Cancel bar at the bottom of the map */
 #map_select_actions

@@ -16,7 +16,8 @@ Game.mapObjects =
 	'offset' : 0,		// servertime - local time, in seconds
 	'poll' : 30,
 	'layer' : null,
-	'canvas' : null,
+	'routes' : null,		// <svg> with one polyline per revealed route
+	'document' : null,	// test hook; the browser's document when null
 	'label' : null,
 	'tickTimer' : null,
 	'pollTimer' : null,
@@ -32,23 +33,34 @@ Game.mapObjects =
 		return Game.mapObjects.now () + Game.mapObjects.offset;
 	},
 
-	/* Setup: called once the TiledImageViewer exists */
-	'init' : function ()
+	'doc' : function ()
 	{
-		if (Game.mapObjects.layer || !Game.map.oScrollMap)
+		return Game.mapObjects.document || document;
+	},
+
+	/* Setup: called once the TiledImageViewer exists */
+	'init' : function (scrollMap)
+	{
+		scrollMap = scrollMap || Game.map.oScrollMap;
+		if (Game.mapObjects.layer || !scrollMap)
 		{
 			return;
 		}
 
-		var layer = document.createElement ('div');
+		var doc = Game.mapObjects.doc ();
+
+		var layer = doc.createElement ('div');
 		layer.className = 'mapobjects';
-		Game.map.oScrollMap.div.appendChild (layer);
+		scrollMap.div.appendChild (layer);
 		Game.mapObjects.layer = layer;
 
-		var canvas = document.createElement ('canvas');
-		canvas.className = 'mapobjects-routes';
-		layer.appendChild (canvas);
-		Game.mapObjects.canvas = canvas;
+		// Routes are SVG polylines: no bitmap to size to the whole route
+		var routes = doc.createElementNS ('http://www.w3.org/2000/svg', 'svg');
+		routes.setAttribute ('class', 'mapobjects-routes');
+		routes.setAttribute ('width', 1);
+		routes.setAttribute ('height', 1);
+		layer.appendChild (routes);
+		Game.mapObjects.routes = routes;
 
 		if (typeof (CONFIG_MAPOBJECT_TEXT) != 'undefined')
 		{
@@ -57,6 +69,9 @@ Game.mapObjects =
 
 		Game.mapObjects.tickTimer = setInterval (Game.mapObjects.tick, 1000);
 		Game.mapObjects.setPollInterval (Game.mapObjects.DEFAULT_POLL);
+
+		// The first region commit ran before the viewer existed: ask now
+		Game.mapObjects.poll_ ();
 	},
 
 	/* Translated texts per kind (plus 'open'), emitted by the game's header template */
@@ -220,7 +235,7 @@ Game.mapObjects =
 		return [px[0] - half, px[1] - half];
 	},
 
-	/* Remaining time of the object's last path, as h:mm */
+	/* Remaining time of the object's current path (the next arrival), as h:mm */
 	'eta' : function (obj, t)
 	{
 		var paths = obj.paths || [];
@@ -229,7 +244,17 @@ Game.mapObjects =
 			return '';
 		}
 
-		var seconds = Math.max (0, paths[paths.length - 1].end - t);
+		var end = paths[paths.length - 1].end;
+		for (var i = 0; i < paths.length; i ++)
+		{
+			if (t < paths[i].end)
+			{
+				end = paths[i].end;
+				break;
+			}
+		}
+
+		var seconds = Math.max (0, end - t);
 		var h = Math.floor (seconds / 3600);
 		var m = Math.floor ((seconds % 3600) / 60);
 		return h + ':' + (m < 10 ? '0' : '') + m;
@@ -253,11 +278,7 @@ Game.mapObjects =
 
 			if (o.lastPx && px[0] != o.lastPx[0])
 			{
-				var facing = px[0] > o.lastPx[0] ? 'facing-right' : 'facing-left';
-				if (o.sprite.className.indexOf (facing) == -1)
-				{
-					o.sprite.className = 'mapobject ' + facing;
-				}
+				Game.mapObjects.setFacing (o.sprite, px[0] > o.lastPx[0] ? 'facing-right' : 'facing-left');
 			}
 
 			o.sprite.style.left = px[0] + 'px';
@@ -266,10 +287,59 @@ Game.mapObjects =
 		}
 	},
 
+	/* Swap the facing class, keeping every other class on the sprite */
+	'setFacing' : function (sprite, facing)
+	{
+		if (sprite.className.indexOf (facing) != -1)
+		{
+			return;
+		}
+
+		var classes = sprite.className.split (' ');
+		var out = [];
+		for (var i = 0; i < classes.length; i ++)
+		{
+			if (classes[i] != '' && classes[i].indexOf ('facing-') != 0)
+			{
+				out.push (classes[i]);
+			}
+		}
+		out.push (facing);
+		sprite.className = out.join (' ');
+	},
+
+	/*
+		Make an element tappable on top of the map. The map's own mousedown and
+		touchstart handlers start a drag and cancel the click that would follow,
+		so stop those from bubbling and treat touchend as the tap.
+	*/
+	'attachTap' : function (el, handler)
+	{
+		var stop = function (event)
+		{
+			if (event && event.stopPropagation) { event.stopPropagation (); }
+		};
+
+		el.addEventListener ('mousedown', stop, false);
+		el.addEventListener ('mouseup', stop, false);
+		el.addEventListener ('touchstart', stop, false);
+		el.addEventListener ('touchend', function (event)
+		{
+			stop (event);
+			if (event && event.preventDefault) { event.preventDefault (); }	// no synthetic click
+			handler (event);
+		}, false);
+		el.onclick = function (event)
+		{
+			stop (event);
+			handler (event);
+		};
+	},
+
 	/* DOM: one div per object */
 	'createSprite' : function (data)
 	{
-		var div = document.createElement ('div');
+		var div = Game.mapObjects.doc ().createElement ('div');
 		div.className = 'mapobject facing-right';
 		div.setAttribute ('data-kind', data.kind);
 		div.style.width = Game.mapObjects.SPRITE_SIZE + 'px';
@@ -280,11 +350,10 @@ Game.mapObjects =
 		if (data.click)
 		{
 			div.className += ' clickable';
-			div.onclick = function (event)
+			Game.mapObjects.attachTap (div, function ()
 			{
 				Game.mapObjects.toggleLabel (data.id, div);
-				if (event) { event.stopPropagation (); }
-			};
+			});
 		}
 
 		Game.mapObjects.layer.appendChild (div);
@@ -306,16 +375,9 @@ Game.mapObjects =
 		}
 	},
 
-	/* Dashed route lines for the objects that reveal their path */
-	'drawRoutes' : function ()
+	/* Pixel polylines of the objects that reveal their path (related ones) */
+	'routeLines' : function ()
 	{
-		var canvas = Game.mapObjects.canvas;
-		if (!canvas || !canvas.getContext)
-		{
-			return;
-		}
-
-		var minX = 0, minY = 0, maxX = 0, maxY = 0, any = false;
 		var lines = [];
 
 		for (var id in Game.mapObjects.objects)
@@ -332,43 +394,46 @@ Game.mapObjects =
 				var pts = data.paths[i].points;
 				for (var j = 0; j < pts.length; j ++)
 				{
-					var px = Game.map.getOrthogonalCors (pts[j][0] * -1, pts[j][1]);
-					line.push (px);
-					if (!any) { minX = maxX = px[0]; minY = maxY = px[1]; any = true; }
-					minX = Math.min (minX, px[0]); maxX = Math.max (maxX, px[0]);
-					minY = Math.min (minY, px[1]); maxY = Math.max (maxY, px[1]);
+					line.push (Game.map.getOrthogonalCors (pts[j][0] * -1, pts[j][1]));
 				}
 			}
 			lines.push (line);
 		}
 
-		if (!any)
+		return lines;
+	},
+
+	/* Dashed route lines, one SVG polyline each (an SVG has no bitmap size limit) */
+	'drawRoutes' : function ()
+	{
+		var svg = Game.mapObjects.routes;
+		if (!svg)
 		{
-			canvas.width = 0;
-			canvas.height = 0;
 			return;
 		}
 
-		canvas.style.left = minX + 'px';
-		canvas.style.top = minY + 'px';
-		canvas.width = Math.max (1, maxX - minX);
-		canvas.height = Math.max (1, maxY - minY);
+		while (svg.children && svg.children.length > 0)
+		{
+			svg.removeChild (svg.children[0]);
+		}
 
-		var ctx = canvas.getContext ('2d');
-		ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-		ctx.lineWidth = 2;
-		if (ctx.setLineDash) { ctx.setLineDash ([6, 4]); }
-
+		var lines = Game.mapObjects.routeLines ();
+		var doc = Game.mapObjects.doc ();
 		for (var l = 0; l < lines.length; l ++)
 		{
-			ctx.beginPath ();
+			var points = [];
 			for (var k = 0; k < lines[l].length; k ++)
 			{
-				var p = lines[l][k];
-				if (k == 0) { ctx.moveTo (p[0] - minX, p[1] - minY); }
-				else { ctx.lineTo (p[0] - minX, p[1] - minY); }
+				points.push (lines[l][k][0] + ',' + lines[l][k][1]);
 			}
-			ctx.stroke ();
+
+			var polyline = doc.createElementNS ('http://www.w3.org/2000/svg', 'polyline');
+			polyline.setAttribute ('points', points.join (' '));
+			polyline.setAttribute ('fill', 'none');
+			polyline.setAttribute ('stroke', 'rgba(255, 255, 255, 0.7)');
+			polyline.setAttribute ('stroke-width', '2');
+			polyline.setAttribute ('stroke-dasharray', '6 4');
+			svg.appendChild (polyline);
 		}
 	},
 
@@ -392,30 +457,30 @@ Game.mapObjects =
 			return;
 		}
 
-		var label = document.createElement ('div');
+		var doc = Game.mapObjects.doc ();
+		var label = doc.createElement ('div');
 		label.className = 'mapobject-label';
 		label.setAttribute ('data-id', id);
 
 		var kind = Game.mapObjects.kindText[o.data.kind] || o.data.kind;
-		var text = document.createElement ('p');
-		text.appendChild (document.createTextNode ((o.data.name ? o.data.name + ' · ' : '') + kind + ' · ' + Game.mapObjects.eta (o.data, Game.mapObjects.serverNow ())));
+		var text = doc.createElement ('p');
+		text.appendChild (doc.createTextNode ((o.data.name ? o.data.name + ' · ' : '') + kind + ' · ' + Game.mapObjects.eta (o.data, Game.mapObjects.serverNow ())));
 		label.appendChild (text);
 
-		var button = document.createElement ('a');
+		var button = doc.createElement ('a');
 		button.href = 'javascript:void(0);';
-		button.appendChild (document.createTextNode (Game.mapObjects.kindText['open'] || 'Open'));
-		button.onclick = function (event)
+		button.appendChild (doc.createTextNode (Game.mapObjects.kindText['open'] || 'Open'));
+		Game.mapObjects.attachTap (button, function ()
 		{
 			Game.map.onObjectClick (sprite, function () { eval (o.data.click); });
 			Game.mapObjects.removeSprite (Game.mapObjects.label);
 			Game.mapObjects.label = null;
-			if (event) { event.stopPropagation (); }
-		};
+		});
 		label.appendChild (button);
 
 		label.style.left = (parseInt (sprite.style.left) + Game.mapObjects.SPRITE_SIZE) + 'px';
 		label.style.top = sprite.style.top;
-		label.onclick = function (event) { if (event) { event.stopPropagation (); } };
+		Game.mapObjects.attachTap (label, function () {});
 
 		Game.mapObjects.layer.appendChild (label);
 		Game.mapObjects.label = label;

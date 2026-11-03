@@ -100,4 +100,22 @@ class MovingObjectsExporterTest extends TestCase
 			[$this->obj('b:4', false, 'attack', 'A → B')], null, 1050);
 		$this->assertSame('neutral.png', $out['objects'][0]['sprite']['url']);
 	}
+
+	public function testResponseOrderDoesNotFollowTheInputOrder(): void
+	{
+		// A game may hand over its objects grouped by kind; the order must not leak that.
+		$exporter = new Neuron_GameServer_Map_MovingObjectsExporter('s');
+		$a = $this->obj('b:1', false, 'attack');
+		$b = $this->obj('s:2', true, 'squad');
+		$c = $this->obj('b:3', false, 'attack');
+
+		$ids = function (array $out) { return array_map(function ($o) { return $o['id']; }, $out['objects']); };
+		$first = $ids($exporter->export([$a, $b, $c], null, 1050));
+		$second = $ids($exporter->export([$c, $a, $b], null, 1050));
+
+		$this->assertSame($first, $second, 'same set, same order whatever the input order');
+		$sorted = $first;
+		sort($sorted, SORT_STRING);
+		$this->assertSame($sorted, $first, 'sorted by the exported id');
+	}
 }

@@ -32,5 +32,6 @@ $tiles = Neuron_Core_Tools::clampInt ($_GET['tiles'] ?? null, 1, 10, 10);
 
 $result = $this->renderMovingObjects ($regions, $tiles, Neuron_GameServer::getPlayer (), NOW);
 
+header ('Content-type: application/json');
 http_response_code ($result['status']);
-echo json_encode ($result['body']);
+echo json_encode ($result['body'], JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_AMP);
