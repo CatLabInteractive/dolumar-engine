@@ -185,6 +185,15 @@ function scrollMapWithTiles() {
 	return { div: null, loadedMapTiles: { '0|0': [0, 0] } };
 }
 
+test('the poll interval from the server does not replace the poll function', () => {
+	const a = load();
+	a.setPollInterval(45);
+	assert.strictEqual(a.pollInterval, 45);
+	assert.strictEqual(typeof a.poll, 'function');
+	a.setPollInterval(45);
+	assert.strictEqual(typeof a.poll, 'function');
+});
+
 test('poll is debounced: several region commits in a row make one request', () => {
 	const a = loadWithDom();
 	let requests = 0;
