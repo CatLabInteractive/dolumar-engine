@@ -19,9 +19,30 @@ Game.layout = {
 	current : null,
 	callbacks : [],
 
+	/*
+		A touch-first device (phone, tablet): the browsers that honour the viewport meta.
+		A touchscreen laptop also has touch events, but its primary pointer is a mouse or
+		trackpad and its browser ignores the viewport meta, so it does not count.
+	*/
 	'isTouch' : function ()
 	{
+		if (window.matchMedia)
+		{
+			return window.matchMedia ('(hover: none) and (pointer: coarse)').matches;
+		}
+
 		return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+	},
+
+	/*
+		Width of the layout viewport. Unlike innerWidth (the visual viewport on iOS Safari)
+		it does not shrink when the player pinch-zooms the page.
+	*/
+	'viewportWidth' : function ()
+	{
+		var root = document.documentElement;
+
+		return (root && root.clientWidth) ? root.clientWidth : window.innerWidth;
 	},
 
 	/*
@@ -46,8 +67,8 @@ Game.layout = {
 
 		if (pref == 'auto')
 		{
-			// Under the 0.5-scale viewport innerWidth is doubled; compare the width at scale 1.
-			return window.innerWidth * Game.layout.currentScale () < Game.layout.BREAKPOINT ? 'mobile' : 'desktop';
+			// Under the 0.5-scale viewport the layout viewport is doubled; compare the width at scale 1.
+			return Game.layout.viewportWidth () * Game.layout.currentScale () < Game.layout.BREAKPOINT ? 'mobile' : 'desktop';
 		}
 
 		return 'desktop';

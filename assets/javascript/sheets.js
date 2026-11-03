@@ -284,9 +284,63 @@ Game.sheets = {
 			}
 		}
 
+		Game.sheets.keepModalsOnTop ();
+
 		for (var k = 0; k < Game.sheets.observers.length; k ++)
 		{
 			Game.sheets.observers[k] ();
+		}
+	},
+
+	/*
+		Sheets paint in DOM order. A sheet opened or focused while a modal is up is appended
+		after it and would cover it: move the modals (backdrop, then sheet) back to the end.
+	*/
+	'keepModalsOnTop' : function ()
+	{
+		var stack = Game.sheets.stack;
+		var container = $('sheets');
+		var modals = [];
+		var i;
+
+		for (i = 0; i < stack.length; i ++)
+		{
+			if (stack[i].modal)
+			{
+				modals.push (stack[i]);
+			}
+		}
+
+		if (!container || modals.length === 0)
+		{
+			return;
+		}
+
+		// Only touch the DOM when a non-modal sheet follows the first modal.
+		var first = modals[0].backdrop ? modals[0].backdrop : modals[0].element;
+		var covered = false;
+
+		for (i = 0; i < stack.length; i ++)
+		{
+			if (!stack[i].modal && (first.compareDocumentPosition (stack[i].element) & Node.DOCUMENT_POSITION_FOLLOWING))
+			{
+				covered = true;
+				break;
+			}
+		}
+
+		if (!covered)
+		{
+			return;
+		}
+
+		for (i = 0; i < modals.length; i ++)
+		{
+			if (modals[i].backdrop)
+			{
+				container.appendChild (modals[i].backdrop);
+			}
+			container.appendChild (modals[i].element);
 		}
 	},
 
