@@ -146,6 +146,7 @@ div.mapobjects div.mapobject-label a
 	bottom: var(--sheet-bottom, 0);
 	z-index: 100000;
 	display: flex;
+	flex-wrap: wrap;
 	gap: 12px;
 	padding: 12px 16px;
 	background: rgba(0, 0, 0, 0.6);
@@ -172,4 +173,44 @@ div.mapobjects div.mapobject-label a
 {
 	background: #3a7d2c;
 	color: #fff;
+}
+
+#map_select_actions p.hint
+{
+	flex: 1 1 100%;
+	margin: 0;
+	color: #fff;
+	font-size: 14px;
+	text-align: center;
+}
+
+/* The object being placed pulses while a location is chosen (desktop and mobile).
+   Only opacity and filter animate: the touch flow positions the pointer with transform. */
+@keyframes tiv-pointer-pulse
+{
+	0%, 100%
+	{
+		opacity: 1;
+		filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.6));
+	}
+
+	50%
+	{
+		opacity: 0.55;
+		filter: drop-shadow(0 0 10px rgba(255, 215, 0, 1));
+	}
+}
+
+.tiv-pointer.selecting
+{
+	animation: tiv-pointer-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce)
+{
+	.tiv-pointer.selecting
+	{
+		animation: none;
+		filter: drop-shadow(0 0 6px rgba(255, 215, 0, 1));
+	}
 }
