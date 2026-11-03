@@ -69,8 +69,8 @@ div.minimap
 	border: 1px solid black;
 }
 
-/* Moving objects (armies) layer, see javascript/armies.js */
-div.armies
+/* Moving objects layer (armies in Dolumar), see javascript/mapobjects.js */
+div.mapobjects
 {
 	position: absolute;
 	left: 0;
@@ -82,13 +82,13 @@ div.armies
 	pointer-events: none;
 }
 
-div.armies canvas.armies-routes
+div.mapobjects canvas.mapobjects-routes
 {
 	position: absolute;
 	pointer-events: none;
 }
 
-div.armies div.army
+div.mapobjects div.mapobject
 {
 	position: absolute;
 	width: 40px;
@@ -98,17 +98,17 @@ div.armies div.army
 	pointer-events: auto;
 }
 
-div.armies div.army.facing-left
+div.mapobjects div.mapobject.facing-left
 {
 	background-position: -40px 0;
 }
 
-div.armies div.army.clickable
+div.mapobjects div.mapobject.clickable
 {
 	cursor: pointer;
 }
 
-div.armies div.army-label
+div.mapobjects div.mapobject-label
 {
 	position: absolute;
 	min-width: 120px;
@@ -121,12 +121,12 @@ div.armies div.army-label
 	z-index: 21;
 }
 
-div.armies div.army-label p
+div.mapobjects div.mapobject-label p
 {
 	margin: 0 0 4px 0;
 }
 
-div.armies div.army-label a
+div.mapobjects div.mapobject-label a
 {
 	display: inline-block;
 	min-height: 32px;

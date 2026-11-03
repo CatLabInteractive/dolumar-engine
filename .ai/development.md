@@ -19,8 +19,8 @@ The engine has no runtime of its own. Develop it through the game's Docker stack
 | PHP 8.4 compatibility | `docker compose exec -w /engine web vendor/bin/phpcs` |
 | Game smoke test | `tools/smoke.sh http://localhost:8080` (add `SMOKE_NO_OAUTH=1` without an OIDC provider) |
 
-The map client has a small Node test (`node --test tests/js/armies.test.js`, no dependencies) for the maths in
-`assets/javascript/armies.js`.
+The map client has a small Node test (`node --test tests/js/mapobjects.test.js`, no dependencies) for the maths in
+`assets/javascript/mapobjects.js`.
 
 `phpunit.xml.dist` sets `failOnWarning`, `failOnDeprecation` and `failOnNotice`: a deprecation is a failing test.
 Several tests need the stack's MySQL and Memcached (`DATABASE_URL` defaults to `mysql://dolumar:dolumar@mysql/dolumar`).

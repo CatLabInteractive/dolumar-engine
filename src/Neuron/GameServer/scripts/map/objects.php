@@ -22,7 +22,7 @@
  */
 
 /*
-	map/objects: the moving objects (armies, ...) touching the posted regions,
+	map/objects: the moving objects (armies in Dolumar, ...) touching the posted regions,
 	as JSON. Same regions[] POST body as map/region. Logged-in players only;
 	anonymous visitors get 403 and an empty list.
 */

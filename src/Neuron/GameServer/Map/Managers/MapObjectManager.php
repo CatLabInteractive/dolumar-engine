@@ -52,7 +52,7 @@ abstract class Neuron_GameServer_Map_Managers_MapObjectManager
 	}
 	
 	/**
-	*	Return the moving objects (armies, ...) that touch any of $areas.
+	*	Return the moving objects (armies in Dolumar, ...) that touch any of $areas.
 	*	$viewer is the player looking at the map (or null); games may use it
 	*	to decide what the object reveals (see MapObject::isRelatedTo).
 	*	Games that have no moving objects keep this default.

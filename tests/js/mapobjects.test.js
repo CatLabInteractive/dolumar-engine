@@ -1,5 +1,5 @@
 // Run with: node --test tests/js
-// Loads assets/javascript/armies.js with a stubbed Game global and tests the pure parts.
+// Loads assets/javascript/mapobjects.js with a stubbed Game global and tests the pure parts.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -25,8 +25,8 @@ function load() {
 		Math,
 	};
 	vm.createContext(ctx);
-	vm.runInContext(fs.readFileSync(path.join(__dirname, '../../assets/javascript/armies.js'), 'utf8'), ctx);
-	return ctx.Game.armies;
+	vm.runInContext(fs.readFileSync(path.join(__dirname, '../../assets/javascript/mapobjects.js'), 'utf8'), ctx);
+	return ctx.Game.mapObjects;
 }
 
 const obj = {
@@ -64,7 +64,7 @@ test('pixelFor negates x like mapIsoJump and centres a 40px sprite', () => {
 test('setObjects keeps known ids, adds new ones, drops missing ones and records the clock offset', () => {
 	const a = load();
 	a.now = () => 2000; // local clock
-	a.createSprite = (o) => ({ id: o.id, removed: false, style: {}, className: 'army' });
+	a.createSprite = (o) => ({ id: o.id, removed: false, style: {}, className: 'mapobject' });
 	a.removeSprite = (s) => { s.removed = true; };
 	a.updateSprite = () => {};
 	a.setObjects({ servertime: 1990, poll: 30, objects: [{ id: 'b:1', kind: 'attack', x: 0, y: 0, paths: [] }, { id: 'a:xyz', kind: 'neutral', x: 1, y: 1, paths: [] }] });
@@ -83,7 +83,7 @@ test('eta formats the remaining seconds of the last path as h:mm', () => {
 	assert.strictEqual(a.eta({ paths: [{ start: 0, end: 7260, points: [[0,0],[1,1]] }] }, 0), '2:01');
 });
 
-test('loadText takes the kind texts from CONFIG_ARMY_TEXT when the game defines it', () => {
+test('loadText takes the kind texts from CONFIG_MAPOBJECT_TEXT when the game defines it', () => {
 	const a = load();
 	assert.deepStrictEqual(Object.assign({}, a.kindText), {});
 	a.loadText({ attack: 'Attacking army', open: 'Open' });

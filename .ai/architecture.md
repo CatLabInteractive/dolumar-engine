@@ -28,7 +28,7 @@ objects per client region, cached), `images` (preload list), `update` (changed r
 (`Neuron_GameServer::renderMovingObjects()`): it asks the game's `MapObjectManager::getMovingObjects($areas, $player)`
 and exports each object through `Neuron_GameServer_Map_MovingObjectsExporter`. A viewer the object is not related to
 (`MapObject::isRelatedTo()`) gets an opaque id, a neutral kind and only the next poll window of the path. Anonymous
-visitors get 403. The client side is `assets/javascript/armies.js` (`Game.armies`), a layer inside the scrolling map
+visitors get 403. The client side is `assets/javascript/mapobjects.js` (`Game.mapObjects`), a layer inside the scrolling map
 div that polls `map/objects` and interpolates sprite positions from the path timestamps.
 
 ## How a game plugs in

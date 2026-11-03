@@ -962,7 +962,7 @@ class Neuron_GameServer
 		Map logs
 	*/
 	/**
-	 * Answer a map/objects request: the moving objects (armies, ...) that
+	 * Answer a map/objects request: the moving objects (armies in Dolumar, ...) that
 	 * touch the given client regions, exported for $player.
 	 *
 	 * @param array $regions sanitized list of array (x, y)
@@ -987,7 +987,7 @@ class Neuron_GameServer
 			$objects = $map->getMapObjectManager ()->getMovingObjects ($areas, $player);
 		}
 
-		$secret = sha1 ((defined ('DB_PASSWORD') ? DB_PASSWORD : '') . 'army');
+		$secret = sha1 ((defined ('DB_PASSWORD') ? DB_PASSWORD : '') . 'mapobjects');
 		$exporter = new Neuron_GameServer_Map_MovingObjectsExporter ($secret, 30);
 
 		return array ('status' => 200, 'body' => $exporter->export ($objects, $player, $now));
