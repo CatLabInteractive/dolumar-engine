@@ -45,6 +45,7 @@
 			var CONFIG_THEME = 'nuncio';
 			var CONFIG_LAYOUT = '<?=htmlspecialchars ($layout)?>';
 			var CONFIG_MAP_TILESIZE = <?=$map_tile_size?>;
+			var CONFIG_PUSH_PUBLIC_KEY = <?=json_encode (Neuron_GameServer_Push_Config::isEnabled () ? Neuron_GameServer_Push_Config::getPublicKey () : '')?>;
 			
 			<?php if (defined ('GOOGLE_ANALYTICS')) { ?>
 			
@@ -107,6 +108,7 @@
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/game.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/functions.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/forum.js?version=<?=$application_version?>"></script>
+		<script type="text/javascript" src="<?=$static_client_url?>javascript/push.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/konami.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/fancybox.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/modernizr/modernizr-1.5.min.js?version=<?=$application_version?>"></script>

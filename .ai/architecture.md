@@ -45,6 +45,32 @@ which also stops browsers from turning a tap into a click; `TIV_touchEnd` theref
 clean tap (one finger, under 10 px of movement, under 500 ms) so image-map areas and movable objects open as on
 desktop. The game supplies its own mobile chrome (header, tab bar) on top of these primitives.
 
+## Browser (Web Push) notifications
+
+`Neuron_GameServer_Player::sendNotification()` delivers a message from the game's `notifications` language file
+through e-mail (offline players only), the dead BrowserGamesHub channel and, for non-public messages, Web Push.
+`sendPushNotification()` sends only the push, for events too frequent for e-mail. Both end in
+`queuePushNotification()`, which writes the JSON payload to `n_push_queue` when push is configured, the category
+(language file section) is not muted and the player has at least one subscribed browser. Nothing is sent inside a
+web request: the game's cron calls `Neuron_GameServer_Push_Sender::flushQueue()` every minute, which delivers
+through `minishlink/web-push`, drops messages older than an hour and deletes subscriptions the push service reports
+as gone (404/410).
+
+- Configuration: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` constants, optional `PUSH_ICON_URL`
+  (`Neuron_GameServer_Push_Config`). Without the keys push is off everywhere and nothing changes.
+- Routes: `push/subscribe` and `push/unsubscribe` (`Neuron_GameServer_Push_Endpoint`: logged-in player, POST,
+  `application/json`, same Origin, and only endpoints on the known push-service hosts, so the cron never posts to a
+  URL a player made up) and `sw.js` (the service worker, `assets/javascript/push/sw.js`, served from the game's root
+  so its scope is the whole game).
+- Storage: `n_push_subscriptions` (one row per browser endpoint, moved to whoever subscribed last) and `n_push_queue`.
+  The schema lives in the game's `dump/`.
+- Client: `assets/javascript/push.js` (`Game.push`). The browser is only asked for permission from the
+  "Browser notifications" section of My Account; on every page load an existing subscription is re-sent so it
+  follows the player logged in on that browser. The service worker skips the notification when a game tab is
+  focused. iOS only supports push for a site added to the home screen.
+- Categories: the game lists what players can mute with `getPushCategories()` (section => label) and what starts
+  muted with `getPushDefaultMuted()`; the choice is stored in the `pushMuted` preference.
+
 ## Configuration
 
 The engine reads configuration from PHP constants that the game's bootstrap defines from environment variables

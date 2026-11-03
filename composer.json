@@ -11,7 +11,8 @@
     "ext-mbstring": "*",
     "ext-gd": "*",
     "ext-bcmath" : "*",
-    "ext-mysqli": "*"
+    "ext-mysqli": "*",
+    "minishlink/web-push": "^11.0"
   },
 
   "require-dev": {
@@ -22,7 +23,8 @@
 
   "config": {
     "allow-plugins": {
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "php-http/discovery": false
     }
   },
 

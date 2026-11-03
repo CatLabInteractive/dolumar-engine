@@ -86,6 +86,14 @@ class Neuron_GameServer
 	}
 
 	/**
+	 * The Web Push service worker, served at <game url>/sw.js.
+	 */
+	public static function getServiceWorkerPath (): string
+	{
+		return self::resolveAssetPath (['javascript', 'push', 'sw.js']);
+	}
+
+	/**
 	 * True when the current request belongs to a logged in admin.
 	 */
 	public static function isAdminRequest (): bool
@@ -513,6 +521,18 @@ class Neuron_GameServer
 
 			case 'time':
 				echo 'time=' . round (microtime (true) * 1000);
+				break;
+
+			case 'push':
+				Neuron_GameServer_Push_Endpoint::dispatch (isset ($sInputs[1]) ? $sInputs[1] : null);
+				break;
+
+			// The service worker must come from the game's own path to control it.
+			case 'sw.js':
+				session_write_close ();
+				header ('Content-Type: application/javascript; charset=utf-8');
+				header ('Cache-Control: no-cache');
+				echo file_get_contents (self::getServiceWorkerPath ());
 				break;
 
 			case '':

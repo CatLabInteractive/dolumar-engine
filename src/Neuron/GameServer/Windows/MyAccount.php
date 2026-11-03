@@ -34,6 +34,11 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 		$this->setPosition (15, 40);
 		
 		$this->setAllowOnlyOnce ();
+
+		if (Neuron_GameServer_Push_Config::isEnabled ())
+		{
+			$this->setOnload ('Game.push.initAccount');
+		}
 	}
 	
 	final public function getContent ($ignoreInitialLoad = true)
@@ -264,6 +269,22 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			$page->set ('todo', $text->get ('todo'));
 			$page->set ('logout', $text->get ('logout'));
 			$page->set ('layout', $me->getPreference ('layout', Neuron_GameServer::LAYOUT_DEFAULT));
+
+			$page->set ('push', Neuron_GameServer_Push_Config::isEnabled ());
+			if (Neuron_GameServer_Push_Config::isEnabled ())
+			{
+				$categories = array ();
+				foreach ($me->getPushCategories () as $category => $label)
+				{
+					$categories[] = array
+					(
+						'id' => $category,
+						'label' => $label,
+						'enabled' => $me->isPushCategoryEnabled ($category)
+					);
+				}
+				$page->set ('pushCategories', $categories);
+			}
 			
 			if ($this->canChangePassword ())
 			{
@@ -484,6 +505,28 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 		{
 			Neuron_GameServer::getPlayer ()->setPreference ('layout', $data['layout']);
 			return $this->reloadWindow ();
+		}
+
+		if
+		(
+			isset ($data['action']) &&
+			$data['action'] === 'push' &&
+			Neuron_GameServer_Push_Config::isEnabled ()
+		)
+		{
+			$me = Neuron_GameServer::getPlayer ();
+
+			$muted = array ();
+			foreach (array_keys ($me->getPushCategories ()) as $category)
+			{
+				if (!isset ($data['push_' . $category]))
+				{
+					$muted[] = $category;
+				}
+			}
+			$me->setPushMuted ($muted);
+
+			return $this->updateContent ($this->showMyAccount ());
 		}
 
 		return $this->updateContent ($this->showMyAccount ());

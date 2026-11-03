@@ -25,4 +25,11 @@ class GameServerAssetRouteTest extends TestCase
 		$this->assertNull(Neuron_GameServer::resolveAssetPath(['css']));
 		$this->assertNull(Neuron_GameServer::resolveAssetPath([]));
 	}
+
+	public function testServiceWorkerIsAnEngineAsset(): void
+	{
+		$path = Neuron_GameServer::getServiceWorkerPath();
+		$this->assertStringEndsWith('assets/javascript/push/sw.js', $path);
+		$this->assertStringContainsString("addEventListener('push'", file_get_contents($path));
+	}
 }
