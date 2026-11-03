@@ -9,7 +9,11 @@
 ignore_user_abort (true);
 error_reporting(E_ERROR);
 
-session_name ('dolumar_session');
+// Cron jobs and other CLI scripts have no visitor, so they get no session.
+if (PHP_SAPI !== 'cli')
+{
+	session_name ('dolumar_session');
+}
 
 define ('CATLAB_BASEPATH', dirname (dirname (__FILE__)) . '/');
 define ('CATLAB_LANGUAGE_PATH', CATLAB_BASEPATH . 'languages/');
@@ -175,9 +179,26 @@ foreach (array (
 	}
 }
 
-session_start (Neuron_Core_Tools::getSessionOptions (array (
-	'use_cookies' => 0
-)));
+if (PHP_SAPI === 'cli')
+{
+	// Same as a fresh session, without touching memcached.
+	$_SESSION = array ();
+}
+elseif (Neuron_Core_Tools::isReadOnlySessionRequest ($_GET['module'] ?? null))
+{
+	// Image requests run in parallel; read without waiting for the lock.
+	ini_set ('memcached.sess_locking', '0');
+	session_start (Neuron_Core_Tools::getSessionOptions (array (
+		'use_cookies' => 0,
+		'read_and_close' => true
+	)));
+}
+else
+{
+	session_start (Neuron_Core_Tools::getSessionOptions (array (
+		'use_cookies' => 0
+	)));
+}
 
 // Get right language tag (only plain two-letter tags; anything else is ignored)
 if (Neuron_Core_Tools::sanitizeLanguageTag ($_GET['language'] ?? null) !== null)

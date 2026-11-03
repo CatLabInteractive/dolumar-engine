@@ -112,6 +112,20 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * True for requests that only read the session (image/ modules such as the
+	 * minimap). They are served in parallel, so they must not take the
+	 * memcached session lock; the dispatcher closes their session right away.
+	 */
+	public static function isReadOnlySessionRequest ($module)
+	{
+		if (!is_string ($module))
+			return false;
+
+		$parts = explode ('/', ltrim ($module, '/'));
+		return $parts[0] === 'image';
+	}
+
+	/**
 	 * Session options shared by every session_start() call.
 	 */
 	public static function getSessionOptions (array $options = array (), ?array $server = null)

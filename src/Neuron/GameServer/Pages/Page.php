@@ -62,6 +62,9 @@ class Neuron_GameServer_Pages_Page
 	
 	public static function getUrl ($sUrl, $sArrs = array (), $sBase = 'page/')
 	{
+		// Admin_Page::getUrl passes null when there are no parameters.
+		$sArrs = $sArrs ?? array ();
+
 		if (!isset ($_COOKIE['session_id']))
 		{
 			$sArrs['session_id'] = session_id ();
