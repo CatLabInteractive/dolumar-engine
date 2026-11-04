@@ -192,6 +192,38 @@ Game.mapObjects =
 	},
 
 	/* Replace the object set with what the server sent */
+	/*
+		Centre the map on an object (e.g. from a link in a game window). When the
+		object is not loaded yet, jump to the fallback location (x, y), which loads
+		the regions around it, and follow the object once a poll brings it in.
+	*/
+	'FOCUS_FOLLOW_SECONDS' : 60,
+	'pendingFocus' : null,
+
+	'focus' : function (id, x, y)
+	{
+		Game.mapObjects.pendingFocus = null;
+
+		if (Game.mapObjects.objects[id])
+		{
+			Game.mapObjects.jumpToObject (Game.mapObjects.objects[id]);
+			return;
+		}
+
+		Game.mapObjects.pendingFocus =
+		{
+			'id' : id,
+			'until' : Game.mapObjects.now () + Game.mapObjects.FOCUS_FOLLOW_SECONDS
+		};
+		Game.map.mapIsoJump (x, y);
+	},
+
+	'jumpToObject' : function (o)
+	{
+		var pos = Game.mapObjects.positionAt (o.data, Game.mapObjects.serverNow ());
+		Game.map.mapIsoJump (pos[0], pos[1]);
+	},
+
 	'setObjects' : function (json)
 	{
 		Game.mapObjects.offset = json.servertime - Game.mapObjects.now ();
@@ -229,6 +261,21 @@ Game.mapObjects =
 			{
 				Game.mapObjects.removeSprite (Game.mapObjects.objects[id].sprite);
 				delete Game.mapObjects.objects[id];
+			}
+		}
+
+		// A focus that was waiting for this object
+		var pending = Game.mapObjects.pendingFocus;
+		if (pending)
+		{
+			if (Game.mapObjects.now () > pending.until)
+			{
+				Game.mapObjects.pendingFocus = null;
+			}
+			else if (Game.mapObjects.objects[pending.id])
+			{
+				Game.mapObjects.pendingFocus = null;
+				Game.mapObjects.jumpToObject (Game.mapObjects.objects[pending.id]);
 			}
 		}
 

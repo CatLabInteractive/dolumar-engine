@@ -30,6 +30,8 @@ and exports each object through `Neuron_GameServer_Map_MovingObjectsExporter`. A
 (`MapObject::isRelatedTo()`) gets an opaque id, a neutral kind and only the next poll window of the path. Anonymous
 visitors get 403. The client side is `assets/javascript/mapobjects.js` (`Game.mapObjects`), a layer inside the scrolling map
 div that polls `map/objects` and interpolates sprite positions from the path timestamps.
+`Game.mapObjects.focus(id, x, y)` centres the map on an object; when it is not loaded yet the map jumps to `(x, y)`
+and follows the object once a poll returns it (for up to a minute).
 
 ## How a game plugs in
 

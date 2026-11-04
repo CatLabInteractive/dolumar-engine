@@ -244,3 +244,40 @@ test('an open label is closed when its object disappears', () => {
 	assert.strictEqual(a.label, null);
 	assert.strictEqual(label.removed, true);
 });
+
+function focusable() {
+	const a = load();
+	const jumps = [];
+	a.ctx.Game.map.mapIsoJump = (x, y) => jumps.push([x, y]);
+	a.now = () => 1050;
+	a.createSprite = (o) => ({ id: o.id, style: {}, className: 'mapobject' });
+	a.removeSprite = () => {};
+	a.updateSprite = () => {};
+	return { a, jumps };
+}
+
+test('focus jumps to the current position of a loaded object', () => {
+	const { a, jumps } = focusable();
+	a.setObjects({ servertime: 1050, objects: [obj] });
+	a.focus('b:1', 99, 99);
+	assert.deepStrictEqual(JSON.parse(JSON.stringify(jumps)), [[5, 0]]);
+	assert.strictEqual(a.pendingFocus, null);
+});
+
+test('focus on an unknown object jumps to the fallback and follows the object once it loads', () => {
+	const { a, jumps } = focusable();
+	a.focus('b:1', 7, 8);
+	assert.deepStrictEqual(JSON.parse(JSON.stringify(jumps)), [[7, 8]]);
+	a.setObjects({ servertime: 1050, objects: [obj] });
+	assert.deepStrictEqual(JSON.parse(JSON.stringify(jumps)), [[7, 8], [5, 0]]);
+	a.setObjects({ servertime: 1050, objects: [obj] });
+	assert.strictEqual(jumps.length, 2, 'the follow-up jump happens once');
+});
+
+test('a pending focus expires, so a later poll does not move the map', () => {
+	const { a, jumps } = focusable();
+	a.focus('b:1', 7, 8);
+	a.now = () => 1050 + 120;
+	a.setObjects({ servertime: 1050 + 120, objects: [obj] });
+	assert.strictEqual(jumps.length, 1);
+});
