@@ -126,6 +126,21 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * True for requests that never use the session: the static files served
+	 * from the engine assets folder (gameserver/ modules). They carry no
+	 * session id, so starting a session would only create an empty session
+	 * in memcached for every stylesheet and script.
+	 */
+	public static function isSessionlessRequest ($module)
+	{
+		if (!is_string ($module))
+			return false;
+
+		$parts = explode ('/', ltrim ($module, '/'));
+		return $parts[0] === 'gameserver';
+	}
+
+	/**
 	 * Session options shared by every session_start() call.
 	 */
 	public static function getSessionOptions (array $options = array (), ?array $server = null)
