@@ -268,7 +268,7 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			
 			$page->set ('todo', $text->get ('todo'));
 			$page->set ('logout', $text->get ('logout'));
-			$page->set ('layout', $me->getPreference ('layout', Neuron_GameServer::LAYOUT_DEFAULT));
+			$page->set ('layout', Neuron_GameServer::getPlayerLayoutPreference ($me) ?? Neuron_GameServer::LAYOUT_DEFAULT);
 
 			$page->set ('push', Neuron_GameServer_Push_Config::isEnabled ());
 			if (Neuron_GameServer_Push_Config::isEnabled ())
@@ -503,7 +503,7 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			in_array ($data['layout'], Neuron_GameServer::LAYOUT_VALUES, true)
 		)
 		{
-			Neuron_GameServer::getPlayer ()->setPreference ('layout', $data['layout']);
+			Neuron_GameServer::getPlayer ()->setPreference (Neuron_GameServer::LAYOUT_PREFERENCE, $data['layout']);
 			return $this->reloadWindow ();
 		}
 

@@ -30,7 +30,55 @@ class Neuron_GameServer
 	const SCRIPT_PATH = __DIR__ . '/GameServer/scripts/';
 
 	public const LAYOUT_VALUES = ['auto', 'desktop', 'mobile'];
-	public const LAYOUT_DEFAULT = 'desktop';
+	public const LAYOUT_DEFAULT = 'auto';
+
+	/**
+	 * Preference key that holds the player's layout choice. It replaced the key 'layout',
+	 * which was saved while the default was still 'desktop': a stored 'desktop' (or 'auto')
+	 * under the old key is not treated as an opt-out, so those players get the new default.
+	 * A stored 'mobile' under the old key was an explicit opt-in and is kept.
+	 */
+	public const LAYOUT_PREFERENCE = 'layoutMode';
+	public const LAYOUT_LEGACY_PREFERENCE = 'layout';
+
+	/**
+	 * The player's saved layout choice, or null when they never made one since the
+	 * default became 'auto'.
+	 */
+	public static function storedLayoutPreference (?string $current, ?string $legacy): ?string
+	{
+		if ($current !== null && in_array ($current, self::LAYOUT_VALUES, true))
+		{
+			return $current;
+		}
+
+		if ($legacy === 'mobile')
+		{
+			return $legacy;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Saved layout choice of a player object (see storedLayoutPreference).
+	 */
+	public static function getPlayerLayoutPreference ($player): ?string
+	{
+		if (!$player)
+		{
+			return null;
+		}
+
+		$current = $player->getPreference (self::LAYOUT_PREFERENCE, null);
+		$legacy = $player->getPreference (self::LAYOUT_LEGACY_PREFERENCE, null);
+
+		return self::storedLayoutPreference
+		(
+			is_string ($current) ? $current : null,
+			is_string ($legacy) ? $legacy : null
+		);
+	}
 
 	/**
 	 * Decide which UI layout the shell uses. A valid query value wins,
@@ -882,9 +930,9 @@ class Neuron_GameServer
 		}
 
 		// Layout (desktop / mobile / auto)
-		$stored = $player ? $player->getPreference ('layout', null) : null;
+		$stored = self::getPlayerLayoutPreference ($player);
 		$query = isset ($_GET['layout']) && is_string ($_GET['layout']) ? $_GET['layout'] : null;
-		$page->set ('layout', self::resolveLayoutPreference (is_string ($stored) ? $stored : null, $query));
+		$page->set ('layout', self::resolveLayoutPreference ($stored, $query));
 
 		echo $page->parse ('gameserver/index.phpt');
 	}
