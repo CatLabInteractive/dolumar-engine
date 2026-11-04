@@ -45,8 +45,8 @@ function TiledImageViewer(
     // (ghost fixed at the centre, Place/Cancel buttons) instead of the mouse flow.
     this.isTouchLayout = null;
 
-    // Optional hook: selectLabel(name) returns the translated text of a touch flow button
-    // ('cancel' or 'place'); a falsy result keeps the English text.
+    // Optional hook: selectLabel(name) returns the translated text of a touch flow label
+    // ('cancel', 'place' or 'hint'); a falsy result keeps the English text.
     this.selectLabel = null;
 
     // True while a touch flow selection is open (it never disables the map controls).
@@ -69,6 +69,7 @@ function TiledImageViewer(
 
     // Make pointer
     var pointer = document.createElement('div');
+    pointer.className = 'tiv-pointer';
     pointer.style.display = 'none';
     this.el.appendChild(pointer);
 
@@ -431,6 +432,9 @@ TiledImageViewer.prototype.selectLocation = function (callback, onFinish, image)
     var self = this;
     this.selecting = true;
 
+    // The pointer (the object being placed) pulses while a location is being chosen.
+    this.setPointerSelecting(true);
+
     if (typeof(this.isTouchLayout) == 'function' && this.isTouchLayout()) {
         this.selectLocationTouch(callback, onFinish, image);
         return;
@@ -544,9 +548,29 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
     actions.addEventListener('mousedown', stop, false);
     actions.addEventListener('mouseup', stop, false);
 
+    // Tell the player that the map moves under the pointer.
+    var hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.appendChild(document.createTextNode(this.getSelectLabel('hint', 'Drag the map to choose a location.')));
+
+    actions.appendChild(hint);
     actions.appendChild(cancel);
     actions.appendChild(place);
     this.el.appendChild(actions);
+};
+
+// Mark the pointer as being placed (class "selecting", styled in map.css) or not.
+TiledImageViewer.prototype.setPointerSelecting = function (selecting) {
+    var pointer = this.el.tivpointer;
+    if (!pointer) {
+        return;
+    }
+
+    var classes = (pointer.className || '').replace(/(^|\s)selecting(?=\s|$)/g, '').replace(/^\s+|\s+$/g, '');
+    if (selecting) {
+        classes = classes ? classes + ' selecting' : 'selecting';
+    }
+    pointer.className = classes;
 };
 
 // Touch flow: button text from the selectLabel hook, or the English fallback.
@@ -643,6 +667,8 @@ TiledImageViewer.prototype.cancelLocationClick = function (x, y) {
     this.onFinish = '';
     this.selLocAct = '';
     this.selLocWin = '';
+
+    this.setPointerSelecting(false);
 
     if (this.el.tivpointer) {
         this.el.tivpointer.style.display = 'none';
