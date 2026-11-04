@@ -124,19 +124,20 @@ div.mapobjects div.mapobject div.mapobject-heading:after
 	height: 0;
 	border-top: 6px solid transparent;
 	border-bottom: 6px solid transparent;
-	border-left: 10px solid #f3d27a;
-	filter: drop-shadow(0 0 1px #3b2507) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+	border-left: 10px solid #40331f;
 }
 
 div.mapobjects div.mapobject-label
 {
 	position: absolute;
 	min-width: 120px;
-	padding: 4px 8px;
-	background: rgba(0, 0, 0, 0.8);
-	color: #fff;
-	font-size: 12px;
-	border-radius: 4px;
+	padding: 6px 8px;
+	background: #fbf3dc;
+	border: 1px solid #8a7550;
+	color: #40331f;
+	font-family: Verdana, sans-serif;
+	font-size: 11px;
+	border-radius: 3px;
 	pointer-events: auto;
 	z-index: 21;
 }
@@ -155,17 +156,32 @@ div.mapobjects div.mapobject-label a.mapobject-label-close
 	min-height: 24px;
 	line-height: 22px;
 	text-align: center;
-	color: #fff;
-	font-size: 16px;
+	color: #40331f;
+	font-size: 14px;
 	text-decoration: none;
 }
 
 div.mapobjects div.mapobject-label a
 {
 	display: inline-block;
-	min-height: 32px;
-	line-height: 32px;
-	color: #ffd700;
+	min-height: 24px;
+	line-height: 24px;
+	color: #000097;
+	text-decoration: underline;
+}
+
+div.mapobjects div.mapobject-label a:hover
+{
+	color: #b3261e;
+}
+
+/* Mobile: 44px tap targets in the label */
+body.layout-mobile div.mapobjects div.mapobject-label a,
+body.layout-mobile div.mapobjects div.mapobject-label a.mapobject-label-close
+{
+	min-height: 44px;
+	min-width: 44px;
+	line-height: 44px;
 }
 
 /* Choosing a location in the mobile layout: Place/Cancel bar at the bottom of the map */
