@@ -1385,7 +1385,8 @@ class Neuron_GameServer_Player
     public function getVacationStart ()
     {
         $this->loadData ();
-        if ($this->data['startVacation'] == null)
+        // NPC owners (player 0) have no row, so there is no data to read.
+        if (($this->data['startVacation'] ?? null) == null)
         {
             return null;
         }
