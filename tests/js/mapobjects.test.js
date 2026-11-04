@@ -249,10 +249,17 @@ test('an open label is closed when its object disappears', () => {
 	assert.strictEqual(label.removed, true);
 });
 
+// Inverse of contentPixel for the test stub (32/16 tiles): content pixel of a tile centre -> tile
+function tileAt(px, py) {
+	const u = (px - 32) / 32, v = (py - 16) / 16;	// u = x + y, v = x - y
+	return [(u + v) / 2, (u - v) / 2];
+}
+
 function focusable() {
 	const a = load();
 	const jumps = [];
-	a.ctx.Game.map.mapIsoJump = (x, y) => jumps.push([x, y]);
+	// Record the tile the map centres on: jumpTo receives the negated content pixel of the tile centre
+	a.ctx.Game.map.oScrollMap = { jumpTo: (px, py) => jumps.push(tileAt(-px, -py)) };
 	a.now = () => 1050;
 	a.createSprite = (o) => ({ id: o.id, style: {}, className: 'mapobject' });
 	a.removeSprite = () => {};
@@ -260,7 +267,7 @@ function focusable() {
 	return { a, jumps };
 }
 
-test('focus jumps to the current position of a loaded object', () => {
+test('focus centres the map on the tile centre of the current position', () => {
 	const { a, jumps } = focusable();
 	a.setObjects({ servertime: 1050, objects: [obj] });
 	a.focus('b:1', 99, 99);

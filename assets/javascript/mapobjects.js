@@ -215,13 +215,28 @@ Game.mapObjects =
 			'id' : id,
 			'until' : Game.mapObjects.now () + Game.mapObjects.FOCUS_FOLLOW_SECONDS
 		};
-		Game.map.mapIsoJump (x, y);
+		Game.mapObjects.jumpTo (x, y);
 	},
 
 	'jumpToObject' : function (o)
 	{
 		var pos = Game.mapObjects.positionAt (o.data, Game.mapObjects.serverNow ());
-		Game.map.mapIsoJump (pos[0], pos[1]);
+		Game.mapObjects.jumpTo (pos[0], pos[1]);
+	},
+
+	/* Like Game.map.mapIsoJump, but centres the middle of the tile instead of its corner */
+	'jumpTo' : function (x, y)
+	{
+		var c = Game.mapObjects.contentPixel (x, y);
+		if (Game.map.oScrollMap)
+		{
+			Game.map.oScrollMap.jumpTo (0 - c[0], 0 - c[1]);
+		}
+
+		if (typeof (Game.minimap) != 'undefined' && Game.minimap.oScrollMap != null)
+		{
+			Game.minimap.mapIsoJump (x, y);
+		}
 	},
 
 	'setObjects' : function (json)
