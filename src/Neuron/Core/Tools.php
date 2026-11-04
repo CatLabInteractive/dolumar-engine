@@ -38,6 +38,133 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * Proxy ranges trusted to report the client address when TRUSTED_PROXIES is not defined:
+	 * loopback and the Docker bridge networks that Dokku's nginx connects from.
+	 */
+	const DEFAULT_TRUSTED_PROXIES = array ('127.0.0.0/8', '::1/128', '172.16.0.0/12');
+
+	/**
+	 * The address of the visitor, as seen through trusted reverse proxies.
+	 *
+	 * REMOTE_ADDR is used unless it belongs to a trusted proxy. Only then are X-Forwarded-For
+	 * (read from the right, skipping further trusted proxies) and X-Real-IP consulted, so a
+	 * visitor that connects directly cannot spoof their address with these headers.
+	 *
+	 * Trusted ranges come from the TRUSTED_PROXIES constant (comma separated CIDR ranges or
+	 * addresses) when it is defined, otherwise from DEFAULT_TRUSTED_PROXIES.
+	 */
+	public static function getClientIp (?array $server = null, ?array $trustedProxies = null)
+	{
+		$server = $server ?? $_SERVER;
+		$trustedProxies = $trustedProxies ?? self::getTrustedProxies ();
+
+		$remote = isset ($server['REMOTE_ADDR']) ? trim ((string)$server['REMOTE_ADDR']) : '';
+		if (!self::isValidIp ($remote))
+			return $remote;
+
+		if (!self::isTrustedProxy ($remote, $trustedProxies))
+			return $remote;
+
+		if (!empty ($server['HTTP_X_FORWARDED_FOR']) && is_string ($server['HTTP_X_FORWARDED_FOR']))
+		{
+			$hops = array_reverse (array_map ('trim', explode (',', $server['HTTP_X_FORWARDED_FOR'])));
+			$client = null;
+
+			foreach ($hops as $hop)
+			{
+				if (!self::isValidIp ($hop))
+					break;
+
+				$client = $hop;
+				if (!self::isTrustedProxy ($hop, $trustedProxies))
+					break;
+			}
+
+			if ($client !== null)
+				return $client;
+		}
+
+		if (!empty ($server['HTTP_X_REAL_IP']) && is_string ($server['HTTP_X_REAL_IP']))
+		{
+			$real = trim ($server['HTTP_X_REAL_IP']);
+			if (self::isValidIp ($real))
+				return $real;
+		}
+
+		return $remote;
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public static function getTrustedProxies ()
+	{
+		if (defined ('TRUSTED_PROXIES'))
+		{
+			$list = TRUSTED_PROXIES;
+			if (is_string ($list))
+				$list = explode (',', $list);
+
+			return array_values (array_filter (array_map ('trim', (array)$list), 'strlen'));
+		}
+
+		return self::DEFAULT_TRUSTED_PROXIES;
+	}
+
+	/**
+	 * Is the address inside one of the given ranges (CIDR notation or plain addresses)?
+	 */
+	public static function isTrustedProxy ($ip, array $ranges)
+	{
+		$packedIp = @inet_pton ((string)$ip);
+		if ($packedIp === false)
+			return false;
+
+		foreach ($ranges as $range)
+		{
+			$parts = explode ('/', trim ((string)$range), 2);
+			$packedRange = @inet_pton ($parts[0]);
+
+			if ($packedRange === false || strlen ($packedRange) !== strlen ($packedIp))
+				continue;
+
+			$maxBits = strlen ($packedIp) * 8;
+			$bits = $maxBits;
+			if (isset ($parts[1]))
+			{
+				if (!ctype_digit ($parts[1]) || (int)$parts[1] > $maxBits)
+					continue;
+
+				$bits = (int)$parts[1];
+			}
+
+			if (self::prefixMatches ($packedIp, $packedRange, $bits))
+				return true;
+		}
+
+		return false;
+	}
+
+	private static function prefixMatches ($a, $b, $bits)
+	{
+		$bytes = intdiv ($bits, 8);
+		if (substr ($a, 0, $bytes) !== substr ($b, 0, $bytes))
+			return false;
+
+		$rest = $bits % 8;
+		if ($rest === 0)
+			return true;
+
+		$mask = (0xFF << (8 - $rest)) & 0xFF;
+		return (ord ($a[$bytes]) & $mask) === (ord ($b[$bytes]) & $mask);
+	}
+
+	private static function isValidIp ($ip)
+	{
+		return is_string ($ip) && filter_var ($ip, FILTER_VALIDATE_IP) !== false;
+	}
+
+	/**
 	 * Return the id if it is a valid PHP session id, otherwise null.
 	 */
 	public static function sanitizeSessionId ($id)

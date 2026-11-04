@@ -595,7 +595,7 @@ class Neuron_GameServer
 			// Dump the profiler
 			if (intval($profiler->getTotalDuration ()) > 2)
 			{
-				$cache = Neuron_Core_Cache::__getInstance ('profiler/'.$_SERVER['REMOTE_ADDR'].'/');
+				$cache = Neuron_Core_Cache::__getInstance ('profiler/'.Neuron_Core_Tools::getClientIp ().'/');
 				$cache->setCache (date ('dmYHis'), (string)$profiler);
 			}
 		}
