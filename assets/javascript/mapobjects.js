@@ -323,10 +323,21 @@ Game.mapObjects =
 		return [end[0], end[1]];
 	},
 
+	/*
+		Position of a tile inside the map content (the scrolling div). mapIsoJump (x, y)
+		moves the div to getOrthogonalCors (-x, y), so the corner of tile (x, y) is at the
+		negation of that point; its centre is half a tile further.
+	*/
+	'contentPixel' : function (x, y)
+	{
+		var px = Game.map.getOrthogonalCors (x * -1, y);
+		return [Game.map.iMapOffsetX - px[0], Game.map.iMapOffsetY - px[1]];
+	},
+
 	/* Pixel position (top-left of the sprite) for a tile position */
 	'pixelFor' : function (x, y)
 	{
-		var px = Game.map.getOrthogonalCors (x * -1, y);
+		var px = Game.mapObjects.contentPixel (x, y);
 		var half = Game.mapObjects.SPRITE_SIZE / 2;
 		return [px[0] - half, px[1] - half];
 	},
@@ -490,7 +501,7 @@ Game.mapObjects =
 				var pts = data.paths[i].points;
 				for (var j = 0; j < pts.length; j ++)
 				{
-					line.push (Game.map.getOrthogonalCors (pts[j][0] * -1, pts[j][1]));
+					line.push (Game.mapObjects.contentPixel (pts[j][0], pts[j][1]));
 				}
 			}
 			lines.push (line);

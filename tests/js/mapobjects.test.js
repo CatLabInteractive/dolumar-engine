@@ -11,6 +11,8 @@ function load() {
 		Game: {
 			map: {
 				getOrthogonalCors: (gx, gy) => [Math.round((gx - gy) * 32), Math.round((gx + gy) * 16)],
+				iMapOffsetX: 32,
+				iMapOffsetY: 16,
 				getURL: (base, query) => base + '?' + query,
 				oScrollMap: null,
 				iTilesPerRegion: 10,
@@ -60,10 +62,12 @@ test('positionAt with no paths is the reported position', () => {
 	assert.deepStrictEqual(Array.from(load().positionAt({ x: 3, y: 4, paths: [] }, 1)), [3, 4]);
 });
 
-test('pixelFor negates x like mapIsoJump and centres a 40px sprite', () => {
+test('pixelFor centres a 40px sprite on the tile in map content coordinates', () => {
 	const a = load();
-	// getOrthogonalCors(-2, 1) = [(-2-1)*32, (-2+1)*16] = [-96, -16]; minus 20 each
-	assert.deepStrictEqual(Array.from(a.pixelFor(2, 1)), [-116, -36]);
+	// mapIsoJump(2, 1) moves the map div to getOrthogonalCors(-2, 1) = [-96, -16] (plus half the screen), so
+	// the tile's corner for (2, 1) sits at [96, 16] in the content and its centre half a tile further, at
+	// [128, 32]; minus 20 each for the sprite
+	assert.deepStrictEqual(Array.from(a.pixelFor(2, 1)), [108, 12]);
 });
 
 test('setObjects keeps known ids, adds new ones, drops missing ones and records the clock offset', () => {
@@ -164,8 +168,8 @@ test('routeLines gives one pixel polyline per object that reveals its path, none
 	};
 	const lines = a.routeLines();
 	assert.strictEqual(lines.length, 1);
-	// points: (0,0) (10,0) (10,0) (10,10) through getOrthogonalCors(-x, y)
-	assert.deepStrictEqual(JSON.parse(JSON.stringify(lines[0])), [[0, 0], [-320, -160], [-320, -160], [-640, 0]]);
+	// points: (0,0) (10,0) (10,0) (10,10) as tile centres in map content pixels
+	assert.deepStrictEqual(JSON.parse(JSON.stringify(lines[0])), [[32, 16], [352, 176], [352, 176], [672, 16]]);
 });
 
 test('drawRoutes draws SVG polylines instead of sizing a canvas to the whole route', () => {
@@ -175,7 +179,7 @@ test('drawRoutes draws SVG polylines instead of sizing a canvas to the whole rou
 	a.drawRoutes();
 	assert.strictEqual(a.routes.children.length, 1);
 	assert.strictEqual(a.routes.children[0].tag, 'polyline');
-	assert.strictEqual(a.routes.children[0].attrs.points, '0,0 -320,-160 -320,-160 -640,0');
+	assert.strictEqual(a.routes.children[0].attrs.points, '32,16 352,176 352,176 672,16');
 	a.objects = {};
 	a.drawRoutes();
 	assert.strictEqual(a.routes.children.length, 0, 'redraw clears old lines');
