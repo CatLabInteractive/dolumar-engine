@@ -192,6 +192,53 @@ Game.mapObjects =
 	},
 
 	/* Replace the object set with what the server sent */
+	/*
+		Centre the map on an object (e.g. from a link in a game window). When the
+		object is not loaded yet, jump to the fallback location (x, y), which loads
+		the regions around it, and follow the object once a poll brings it in.
+	*/
+	'FOCUS_FOLLOW_SECONDS' : 60,
+	'pendingFocus' : null,
+
+	'focus' : function (id, x, y)
+	{
+		Game.mapObjects.pendingFocus = null;
+
+		if (Game.mapObjects.objects[id])
+		{
+			Game.mapObjects.jumpToObject (Game.mapObjects.objects[id]);
+			return;
+		}
+
+		Game.mapObjects.pendingFocus =
+		{
+			'id' : id,
+			'until' : Game.mapObjects.now () + Game.mapObjects.FOCUS_FOLLOW_SECONDS
+		};
+		Game.mapObjects.jumpTo (x, y);
+	},
+
+	'jumpToObject' : function (o)
+	{
+		var pos = Game.mapObjects.positionAt (o.data, Game.mapObjects.serverNow ());
+		Game.mapObjects.jumpTo (pos[0], pos[1]);
+	},
+
+	/* Like Game.map.mapIsoJump, but centres the middle of the tile instead of its corner */
+	'jumpTo' : function (x, y)
+	{
+		var c = Game.mapObjects.contentPixel (x, y);
+		if (Game.map.oScrollMap)
+		{
+			Game.map.oScrollMap.jumpTo (0 - c[0], 0 - c[1]);
+		}
+
+		if (typeof (Game.minimap) != 'undefined' && Game.minimap.oScrollMap != null)
+		{
+			Game.minimap.mapIsoJump (x, y);
+		}
+	},
+
 	'setObjects' : function (json)
 	{
 		Game.mapObjects.offset = json.servertime - Game.mapObjects.now ();
@@ -229,6 +276,21 @@ Game.mapObjects =
 			{
 				Game.mapObjects.removeSprite (Game.mapObjects.objects[id].sprite);
 				delete Game.mapObjects.objects[id];
+			}
+		}
+
+		// A focus that was waiting for this object
+		var pending = Game.mapObjects.pendingFocus;
+		if (pending)
+		{
+			if (Game.mapObjects.now () > pending.until)
+			{
+				Game.mapObjects.pendingFocus = null;
+			}
+			else if (Game.mapObjects.objects[pending.id])
+			{
+				Game.mapObjects.pendingFocus = null;
+				Game.mapObjects.jumpToObject (Game.mapObjects.objects[pending.id]);
 			}
 		}
 
@@ -276,10 +338,21 @@ Game.mapObjects =
 		return [end[0], end[1]];
 	},
 
+	/*
+		Position of a tile inside the map content (the scrolling div). mapIsoJump (x, y)
+		moves the div to getOrthogonalCors (-x, y), so the corner of tile (x, y) is at the
+		negation of that point; its centre is half a tile further.
+	*/
+	'contentPixel' : function (x, y)
+	{
+		var px = Game.map.getOrthogonalCors (x * -1, y);
+		return [Game.map.iMapOffsetX - px[0], Game.map.iMapOffsetY - px[1]];
+	},
+
 	/* Pixel position (top-left of the sprite) for a tile position */
 	'pixelFor' : function (x, y)
 	{
-		var px = Game.map.getOrthogonalCors (x * -1, y);
+		var px = Game.mapObjects.contentPixel (x, y);
 		var half = Game.mapObjects.SPRITE_SIZE / 2;
 		return [px[0] - half, px[1] - half];
 	},
@@ -443,7 +516,7 @@ Game.mapObjects =
 				var pts = data.paths[i].points;
 				for (var j = 0; j < pts.length; j ++)
 				{
-					line.push (Game.map.getOrthogonalCors (pts[j][0] * -1, pts[j][1]));
+					line.push (Game.mapObjects.contentPixel (pts[j][0], pts[j][1]));
 				}
 			}
 			lines.push (line);
