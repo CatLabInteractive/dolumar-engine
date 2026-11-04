@@ -483,6 +483,12 @@ class Neuron_GameServer_Windows_Window
 			// Regular update
 			$this->getRefresh ();
 		}
+
+		// An army (or other moving object) was sent or recalled while handling this window
+		if (Neuron_GameServer_Map_MapObjectRefresh::take ())
+		{
+			$this->refreshMapObjects ();
+		}
 		
 		$dom = $this->dom;
 
@@ -757,7 +763,16 @@ class Neuron_GameServer_Windows_Window
 		$this->updates[] = $update;
 	}
 	
-	public function reloadMap ()
+	/** Make the client ask map/objects now (see Neuron_GameServer_Map_MapObjectRefresh) */
+	public function refreshMapObjects ()
+	{
+		$update = $this->dom->createElement ('update');
+		$update->setAttribute ('action', 'refreshMapObjects');
+
+		$this->updates[] = $update;
+	}
+
+		public function reloadMap ()
 	{
 		$dom = $this->dom;
 		
