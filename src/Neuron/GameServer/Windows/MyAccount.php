@@ -503,8 +503,11 @@ class Neuron_GameServer_Windows_MyAccount extends Neuron_GameServer_Windows_Wind
 			in_array ($data['layout'], Neuron_GameServer::LAYOUT_VALUES, true)
 		)
 		{
+			// The client already switched the layout live (Game.layout.setPreference in the
+			// select's onchange), so only store the choice and redraw this window. A full page
+			// reload is not needed: CONFIG_LAYOUT only matters for the next page load.
 			Neuron_GameServer::getPlayer ()->setPreference (Neuron_GameServer::LAYOUT_PREFERENCE, $data['layout']);
-			return $this->reloadWindow ();
+			return $this->updateContent ($this->showMyAccount ());
 		}
 
 		if
