@@ -94,3 +94,10 @@ test('a layout change calls the onChange callbacks once per change', () => {
 	b.resize();
 	assert.deepStrictEqual(modes, ['mobile', 'desktop']);
 });
+
+test('no preference in the shell: auto, so a phone gets the mobile layout', () => {
+	const b = browser({ width: 390, preference: undefined, touchFirst: true, touchEvents: true, honoursViewport: true });
+	b.layout.init();
+	assert.strictEqual(b.layout.preference, 'auto');
+	assert.strictEqual(b.layout.current, 'mobile');
+});

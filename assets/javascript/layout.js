@@ -14,7 +14,7 @@ Game.layout = {
 	DESKTOP_TOUCH_VIEWPORT : 'user-scalable=no, initial-scale=0.5, maximum-scale=0.5, minimum-scale=0.5, width=device-width, height=device-height',
 	DEFAULT_VIEWPORT : 'width=device-width, initial-scale=1, viewport-fit=cover',
 
-	preference : 'desktop',
+	preference : 'auto',
 
 	current : null,
 	callbacks : [],

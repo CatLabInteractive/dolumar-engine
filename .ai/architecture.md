@@ -44,8 +44,10 @@ Windows are the core UI unit. Every window extends `Neuron_GameServer_Windows_Wi
 ## Layout modes and sheets
 
 The client has two layout modes. `assets/javascript/layout.js` (`Game.layout`) resolves the `layout` preference
-(`auto`, `desktop` or `mobile`; default `Neuron_GameServer::LAYOUT_DEFAULT`, stored per player and changed from
-the account window with `action=layout`, or overridden for one request with `?layout=`) into `body.layout-mobile`
+(`auto`, `desktop` or `mobile`; default `Neuron_GameServer::LAYOUT_DEFAULT`, which is `auto`, stored per player
+under the preference key `layoutMode` and changed from the account window with `action=layout`, or overridden for
+one request with `?layout=`; the older key `layout` dates from when the default was `desktop`, so only a `mobile`
+saved there is still honoured) into `body.layout-mobile`
 or `body.layout-desktop`. `auto` switches at a width of 800 CSS pixels. In mobile mode `assets/javascript/sheets.js`
 (`Game.sheets`) renders the same windows the `dialog` route returns as full-width stacked sheets instead of
 draggable windows; `Game.gui.relayoutWindows(mode)` moves open windows between the two presentations. The map
