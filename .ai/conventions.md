@@ -27,6 +27,9 @@ Legacy code: match the surrounding style and keep changes small. Do not modernis
 - Anonymous routes (`api`, `image`, `map`, `gameserver/assets`, `test`) are locked down; asset paths are resolved
   with path-traversal checks (`tests/GameServerAssetRouteTest.php`). Any new route that takes input from the URL
   needs the same care and a test.
+- The visitor's address comes from `Neuron_Core_Tools::getClientIp()`, never `$_SERVER['REMOTE_ADDR']`: the game runs
+  behind a reverse proxy. It trusts `X-Forwarded-For` / `X-Real-IP` only from `TRUSTED_PROXIES` (default loopback and
+  `172.16.0.0/12`), see `tests/Core/ClientIpTest.php`.
 - Credits and server-list integrations must stay silent when their configuration is missing.
 
 ## Tests

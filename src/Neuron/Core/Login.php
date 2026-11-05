@@ -496,7 +496,7 @@ class Neuron_Core_Login
 	
 	private function getIp ()
 	{
-		return $_SERVER["REMOTE_ADDR"];
+		return Neuron_Core_Tools::getClientIp ();
 	}
 	
 	private function logFailure ($username)

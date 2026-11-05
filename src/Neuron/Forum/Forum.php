@@ -23,11 +23,6 @@
 
 define ('HORNET_DEV', ($_SERVER['DOCUMENT_ROOT'] == 'C:/xampp/xampp/Web'));//needed in copied section
 
-function q ($stuff, $label = '') {
-	if ($label != '') { $label = "[ $label ]<br />"; }
-	if($_SERVER['REMOTE_ADDR'] == '82.28.27.211') { print '<pre>'.$label; var_dump ($stuff); print '</pre>';}
-}
-
 function safen(&$data) {
 	//if using safen & dbPack, always use safen($stuff); dbPack($stuff); - there be errors otherwise.  _NEVER_ try safen(dbpack($stuff)), as they both modify the data by reference the outer one will always fail - and that'd usually mean no SQL escaping would take place, as dbPack(safen(stuff)) would return mangled text it'd be spotted and thus not used in that order.
 	//$data = mysqli_real_escape_string($data);
@@ -1158,8 +1153,8 @@ class Neuron_Forum_Forum
 		$this->forumType = $iForumType;
 		$this->forumID = $iForumId;
 		$this->compID = "$iForumType:$iForumId";
-		$this->isOmni = ($bCanSeeAll || $_SERVER['REMOTE_ADDR'] == '82.28.27.211');
-		$this->isMod = ($bIsModerator || $_SERVER['REMOTE_ADDR'] == '82.28.27.211');
+		$this->isOmni = $bCanSeeAll;
+		$this->isMod = $bIsModerator;
 		$this->userID = is_object($objUser) ? $objUser->getId() : 0;
 		
 		$this->board = new forumBoard($this);
