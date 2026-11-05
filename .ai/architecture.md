@@ -32,6 +32,9 @@ visitors get 403. The client side is `assets/javascript/mapobjects.js` (`Game.ma
 div that polls `map/objects` and interpolates sprite positions from the path timestamps.
 `Game.mapObjects.focus(id, x, y)` centres the map on an object; when it is not loaded yet the map jumps to `(x, y)`
 and follows the object once a poll returns it (for up to a minute).
+Sprites carry a heading arrow (`headingAt()`); routes are not drawn. Game code that sends or recalls a moving object
+calls `Neuron_GameServer_Map_MapObjectRefresh::request()`: the window handling that request then sends a
+`refreshMapObjects` update and the client polls `map/objects` at once.
 
 ## How a game plugs in
 

@@ -16,7 +16,6 @@ Game.mapObjects =
 	'offset' : 0,		// servertime - local time, in seconds
 	'pollInterval' : 30,	// seconds between polls, as the server last asked
 	'layer' : null,
-	'routes' : null,		// <svg> with one polyline per revealed route
 	'document' : null,	// test hook; the browser's document when null
 	'label' : null,
 	'tickTimer' : null,
@@ -61,13 +60,13 @@ Game.mapObjects =
 		scrollMap.div.appendChild (layer);
 		Game.mapObjects.layer = layer;
 
-		// Routes are SVG polylines: no bitmap to size to the whole route
-		var routes = doc.createElementNS ('http://www.w3.org/2000/svg', 'svg');
-		routes.setAttribute ('class', 'mapobjects-routes');
-		routes.setAttribute ('width', 1);
-		routes.setAttribute ('height', 1);
-		layer.appendChild (routes);
-		Game.mapObjects.routes = routes;
+		// A press anywhere else on the map closes an open label (sprites and the
+		// label stop their own presses from reaching the map)
+		if (scrollMap.div.addEventListener)
+		{
+			scrollMap.div.addEventListener ('mousedown', Game.mapObjects.closeLabel, false);
+			scrollMap.div.addEventListener ('touchstart', Game.mapObjects.closeLabel, false);
+		}
 
 		if (typeof (CONFIG_MAPOBJECT_TEXT) != 'undefined')
 		{
@@ -123,6 +122,18 @@ Game.mapObjects =
 			Game.mapObjects.pollDebounce = null;
 			Game.mapObjects.poll_ ();
 		}, 100);
+	},
+
+	/* Ask now (after the player sent or recalled an army), dropping a debounced poll */
+	'refresh' : function ()
+	{
+		if (Game.mapObjects.pollDebounce)
+		{
+			clearTimeout (Game.mapObjects.pollDebounce);
+			Game.mapObjects.pollDebounce = null;
+		}
+
+		Game.mapObjects.poll_ ();
 	},
 
 	/* The HTTP call, separated so it can be stubbed */
@@ -301,7 +312,6 @@ Game.mapObjects =
 			Game.mapObjects.label = null;
 		}
 
-		Game.mapObjects.drawRoutes ();
 		Game.mapObjects.tick ();
 	},
 
@@ -336,6 +346,31 @@ Game.mapObjects =
 
 		var end = last.points[last.points.length - 1];
 		return [end[0], end[1]];
+	},
+
+	/*
+		Screen direction (degrees, 0 = right, clockwise) of the path the object is on
+		at time t, or null when it is not moving (not started, waiting, arrived).
+	*/
+	'headingAt' : function (obj, t)
+	{
+		var paths = obj.paths || [];
+		for (var i = 0; i < paths.length; i ++)
+		{
+			var p = paths[i];
+			if (t >= p.start && t < p.end)
+			{
+				var a = Game.mapObjects.contentPixel (p.points[0][0], p.points[0][1]);
+				var last = p.points[p.points.length - 1];
+				var b = Game.mapObjects.contentPixel (last[0], last[1]);
+				if (a[0] == b[0] && a[1] == b[1])
+				{
+					return null;
+				}
+				return Math.atan2 (b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+			}
+		}
+		return null;
 	},
 
 	/*
@@ -406,6 +441,20 @@ Game.mapObjects =
 			o.sprite.style.left = px[0] + 'px';
 			o.sprite.style.top = px[1] + 'px';
 			o.lastPx = px;
+
+			if (o.sprite.heading)
+			{
+				var heading = Game.mapObjects.headingAt (o.data, t);
+				if (heading === null)
+				{
+					o.sprite.heading.style.display = 'none';
+				}
+				else
+				{
+					o.sprite.heading.style.display = 'block';
+					o.sprite.heading.style.transform = 'rotate(' + (Math.round (heading * 10) / 10) + 'deg)';
+				}
+			}
 		}
 	},
 
@@ -469,6 +518,13 @@ Game.mapObjects =
 		div.style.backgroundImage = "url('" + data.sprite.url + "')";
 		div.title = data.name || '';
 
+		// Arrow around the sprite pointing where the object goes (rotated by tick)
+		var heading = Game.mapObjects.doc ().createElement ('div');
+		heading.className = 'mapobject-heading';
+		heading.style.display = 'none';
+		div.appendChild (heading);
+		div.heading = heading;
+
 		if (data.click)
 		{
 			div.className += ' clickable';
@@ -497,76 +553,13 @@ Game.mapObjects =
 		}
 	},
 
-	/* Pixel polylines of the objects that reveal their path (related ones) */
-	'routeLines' : function ()
-	{
-		var lines = [];
-
-		for (var id in Game.mapObjects.objects)
-		{
-			var data = Game.mapObjects.objects[id].data;
-			if (!data.click || !data.paths || data.paths.length == 0)
-			{
-				continue;
-			}
-
-			var line = [];
-			for (var i = 0; i < data.paths.length; i ++)
-			{
-				var pts = data.paths[i].points;
-				for (var j = 0; j < pts.length; j ++)
-				{
-					line.push (Game.mapObjects.contentPixel (pts[j][0], pts[j][1]));
-				}
-			}
-			lines.push (line);
-		}
-
-		return lines;
-	},
-
-	/* Dashed route lines, one SVG polyline each (an SVG has no bitmap size limit) */
-	'drawRoutes' : function ()
-	{
-		var svg = Game.mapObjects.routes;
-		if (!svg)
-		{
-			return;
-		}
-
-		while (svg.children && svg.children.length > 0)
-		{
-			svg.removeChild (svg.children[0]);
-		}
-
-		var lines = Game.mapObjects.routeLines ();
-		var doc = Game.mapObjects.doc ();
-		for (var l = 0; l < lines.length; l ++)
-		{
-			var points = [];
-			for (var k = 0; k < lines[l].length; k ++)
-			{
-				points.push (lines[l][k][0] + ',' + lines[l][k][1]);
-			}
-
-			var polyline = doc.createElementNS ('http://www.w3.org/2000/svg', 'polyline');
-			polyline.setAttribute ('points', points.join (' '));
-			polyline.setAttribute ('fill', 'none');
-			polyline.setAttribute ('stroke', 'rgba(255, 255, 255, 0.7)');
-			polyline.setAttribute ('stroke-width', '2');
-			polyline.setAttribute ('stroke-dasharray', '6 4');
-			svg.appendChild (polyline);
-		}
-	},
-
 	/* Label with name, kind, ETA and an "open" button */
 	'toggleLabel' : function (id, sprite)
 	{
 		if (Game.mapObjects.label)
 		{
 			var wasFor = Game.mapObjects.label.getAttribute ('data-id');
-			Game.mapObjects.removeSprite (Game.mapObjects.label);
-			Game.mapObjects.label = null;
+			Game.mapObjects.closeLabel ();
 			if (wasFor == id)
 			{
 				return;
@@ -584,6 +577,14 @@ Game.mapObjects =
 		label.className = 'mapobject-label';
 		label.setAttribute ('data-id', id);
 
+		var close = doc.createElement ('a');
+		close.className = 'mapobject-label-close';
+		close.href = 'javascript:void(0);';
+		close.title = Game.mapObjects.kindText['close'] || 'Close';
+		close.appendChild (doc.createTextNode ('\u00d7'));
+		Game.mapObjects.attachTap (close, Game.mapObjects.closeLabel);
+		label.appendChild (close);
+
 		var kind = Game.mapObjects.kindText[o.data.kind] || o.data.kind;
 		var text = doc.createElement ('p');
 		text.appendChild (doc.createTextNode ((o.data.name ? o.data.name + ' · ' : '') + kind + ' · ' + Game.mapObjects.eta (o.data, Game.mapObjects.serverNow ())));
@@ -595,8 +596,7 @@ Game.mapObjects =
 		Game.mapObjects.attachTap (button, function ()
 		{
 			Game.map.onObjectClick (sprite, function () { eval (o.data.click); });
-			Game.mapObjects.removeSprite (Game.mapObjects.label);
-			Game.mapObjects.label = null;
+			Game.mapObjects.closeLabel ();
 		});
 		label.appendChild (button);
 
@@ -606,5 +606,14 @@ Game.mapObjects =
 
 		Game.mapObjects.layer.appendChild (label);
 		Game.mapObjects.label = label;
+	},
+
+	'closeLabel' : function ()
+	{
+		if (Game.mapObjects.label)
+		{
+			Game.mapObjects.removeSprite (Game.mapObjects.label);
+			Game.mapObjects.label = null;
+		}
 	}
 };

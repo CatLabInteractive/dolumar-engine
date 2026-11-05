@@ -114,7 +114,7 @@ function fakeDocument() {
 		addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
 		fire(type, event) { (this.listeners[type] || []).forEach((fn) => fn(event)); if (type == 'click' && this.onclick) { this.onclick(event); } },
 	});
-	return { createElement: el, createElementNS: (ns, tag) => el(tag), hidden: false };
+	return { createElement: el, createElementNS: (ns, tag) => el(tag), createTextNode: (t) => ({ text: t }), hidden: false };
 }
 
 function loadWithDom() {
@@ -160,29 +160,77 @@ test('a tap (touchend) on a sprite opens its label and does not reach the map', 
 	assert.ok(stopped >= 2, 'touch events do not start a map drag');
 });
 
-test('routeLines gives one pixel polyline per object that reveals its path, none for neutral ones', () => {
-	const a = load();
-	a.objects = {
-		'b:1': { data: { click: 'x', paths: obj.paths } },
-		'a:1': { data: { kind: 'neutral', paths: [{ start: 0, end: 1, points: [[0, 0], [1, 0]] }] } },
-	};
-	const lines = a.routeLines();
-	assert.strictEqual(lines.length, 1);
-	// points: (0,0) (10,0) (10,0) (10,10) as tile centres in map content pixels
-	assert.deepStrictEqual(JSON.parse(JSON.stringify(lines[0])), [[32, 16], [352, 176], [352, 176], [672, 16]]);
+test('no route lines: the layer has no SVG and nothing draws routes', () => {
+	const a = loadWithDom();
+	a.poll_ = () => {};
+	const scrollDiv = a.document.createElement('div');
+	a.init({ div: scrollDiv });
+	assert.strictEqual(scrollDiv.children[0].children.length, 0);
+	assert.strictEqual(a.drawRoutes, undefined);
+	assert.strictEqual(a.routeLines, undefined);
 });
 
-test('drawRoutes draws SVG polylines instead of sizing a canvas to the whole route', () => {
+test('headingAt is the screen angle of the current path, null while not moving', () => {
+	const a = load();
+	// (0,0)->(10,0) runs to content pixel +320,+160: atan2(160, 320)
+	assert.ok(Math.abs(a.headingAt(obj, 1050) - 26.565) < 0.01);
+	// (10,0)->(10,10) runs to +320,-160
+	assert.ok(Math.abs(a.headingAt(obj, 1150) + 26.565) < 0.01);
+	assert.strictEqual(a.headingAt(obj, 500), null, 'not started');
+	assert.strictEqual(a.headingAt(obj, 9000), null, 'arrived');
+	assert.strictEqual(a.headingAt({ paths: [{ start: 0, end: 100, points: [[3, 3], [3, 3]] }] }, 50), null, 'waiting');
+});
+
+test('createSprite adds a heading arrow and tick points it the way the army goes', () => {
 	const a = loadWithDom();
-	a.routes = a.document.createElementNS('svg', 'svg');
-	a.objects = { 'b:1': { data: { click: 'x', paths: obj.paths } } };
-	a.drawRoutes();
-	assert.strictEqual(a.routes.children.length, 1);
-	assert.strictEqual(a.routes.children[0].tag, 'polyline');
-	assert.strictEqual(a.routes.children[0].attrs.points, '32,16 352,176 352,176 672,16');
-	a.objects = {};
-	a.drawRoutes();
-	assert.strictEqual(a.routes.children.length, 0, 'redraw clears old lines');
+	a.layer = a.document.createElement('div');
+	a.serverNow = () => 1050;
+	const sprite = a.createSprite(Object.assign({ sprite: { url: 'x.png' } }, obj));
+	const arrow = sprite.children.find((c) => c.className == 'mapobject-heading');
+	assert.ok(arrow, 'arrow element');
+	a.objects = { 'b:1': { data: obj, sprite, lastPx: null } };
+	a.tick();
+	assert.strictEqual(arrow.style.display, 'block');
+	assert.strictEqual(arrow.style.transform, 'rotate(26.6deg)');
+	a.serverNow = () => 9000;
+	a.tick();
+	assert.strictEqual(arrow.style.display, 'none', 'hidden once it stands still');
+});
+
+test('the label has a close button, so it can be closed without opening the window', () => {
+	const a = loadWithDom();
+	a.layer = a.document.createElement('div');
+	a.ctx.Game.map.onObjectClick = () => { throw new Error('must not open'); };
+	a.objects = { 'b:1': { data: Object.assign({ click: 'x()', name: 'A' }, obj), sprite: null } };
+	const sprite = { style: { left: '0px', top: '0px' } };
+	a.toggleLabel('b:1', sprite);
+	const close = a.label.children.find((c) => c.className == 'mapobject-label-close');
+	assert.ok(close, 'close button');
+	const label = a.label;
+	close.fire('click', { stopPropagation: () => {} });
+	assert.strictEqual(a.label, null);
+	assert.strictEqual(label.parentNode, null, 'removed from the layer');
+});
+
+test('closeLabel closes an open label and does nothing without one', () => {
+	const a = loadWithDom();
+	a.layer = a.document.createElement('div');
+	a.closeLabel();
+	a.objects = { 'b:1': { data: Object.assign({ click: 'x()', name: 'A' }, obj), sprite: null } };
+	a.toggleLabel('b:1', { style: { left: '0px', top: '0px' } });
+	a.closeLabel();
+	assert.strictEqual(a.label, null);
+	assert.strictEqual(a.layer.children.length, 0);
+});
+
+test('refresh asks the server straight away, without the debounce', () => {
+	const a = load();
+	let polls = 0;
+	a.poll_ = () => { polls ++; };
+	a.poll();
+	a.refresh();
+	assert.strictEqual(polls, 1);
+	assert.strictEqual(a.pollDebounce, null, 'pending debounced poll cancelled');
 });
 
 function scrollMapWithTiles() {

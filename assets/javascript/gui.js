@@ -576,6 +576,13 @@ Game.gui =
 			case 'reloadMap':
 				Game.map.reloadMap ();
 			break;
+
+			case 'refreshMapObjects':
+				if (typeof (Game.mapObjects) != 'undefined')
+				{
+					Game.mapObjects.refresh ();
+				}
+			break;
 			
 			case 'addContentToElement':
 				// Add content to an object & make it visible (= scroll down or up)
