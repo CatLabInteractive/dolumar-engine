@@ -1202,7 +1202,9 @@ Game.map =
 	},
 	
 	// Select location
-	'selectLocation' : function (fTrigger, onFinish, sImage)
+	// oPreview (optional) shows what a spot is worth while it is chosen,
+	// see Game.map.placementPreview.
+	'selectLocation' : function (fTrigger, onFinish, sImage, oPreview)
 	{
 		// Fetch the right image
 		if (typeof (onFinish) == 'undefined')
@@ -1226,6 +1228,23 @@ Game.map =
 			{
 				var pointer = null;
 			}
+
+			var fFinish = onFinish;
+			if (typeof (oPreview) == 'object' && oPreview != null)
+			{
+				Game.map.placementPreview.start (oPreview);
+
+				Game.map.oScrollMap.onSelectMove = function (x, y)
+				{
+					Game.map.placementPreview.update (x, y);
+				};
+
+				fFinish = function ()
+				{
+					Game.map.placementPreview.stop ();
+					onFinish ();
+				};
+			}
 		
 			Game.map.oScrollMap.selectLocation
 			(
@@ -1235,9 +1254,199 @@ Game.map =
 					var cors = Game.map.getIsometricCors (x, y);
 					fTrigger (cors[0], cors[1]);
 				},
-				onFinish,
+				fFinish,
 				pointer
 			);
+		}
+	},
+
+	/*
+		Placement preview: while a location is chosen, outline the area around
+		the tile under the pointer and show the sum of the values of the
+		special tiles inside it (for example +40% wood for two forest tiles).
+
+		Options (from the game):
+		- area: tiles around the chosen tile that count (1 = a 3x3 square)
+		- tiles: [[x, y, value, name], ...] the special tiles (map coordinates)
+		- text: label with @@value for the sum, for example '+@@value% wood'
+		- none: label when the area holds no special tile
+	*/
+	'placementPreview' :
+	{
+		'oOptions' : null,
+		'oTiles' : null,
+		'oLayer' : null,
+		'oArea' : null,
+		'oLabel' : null,
+		'sLast' : null,
+
+		'SVG' : 'http://www.w3.org/2000/svg',
+
+		// Map point of isometric location (a, b): the inverse of Game.map.getIsometricCors.
+		'getPoint' : function (a, b)
+		{
+			return [ (a + b) * Game.map.iMapOffsetX, (a - b + 1) * Game.map.iMapOffsetY ];
+		},
+
+		// SVG points of the diamond that covers isometric x0..x1, y0..y1.
+		'getDiamond' : function (x0, y0, x1, y1)
+		{
+			var p = Game.map.placementPreview;
+			var corners = [ p.getPoint (x0, y0), p.getPoint (x1, y0), p.getPoint (x1, y1), p.getPoint (x0, y1) ];
+
+			var out = [];
+			for (var i = 0; i < corners.length; i ++)
+			{
+				out.push (corners[i][0] + ',' + corners[i][1]);
+			}
+			return out.join (' ');
+		},
+
+		'start' : function (options)
+		{
+			var p = Game.map.placementPreview;
+			p.stop ();
+
+			if (Game.map.oScrollMap == null)
+			{
+				return;
+			}
+
+			p.oOptions = options;
+			p.oTiles = {};
+			p.sLast = null;
+
+			var layer = document.createElement ('div');
+			layer.className = 'map-placement-preview';
+
+			var svg = document.createElementNS (p.SVG, 'svg');
+			svg.setAttribute ('width', '1');
+			svg.setAttribute ('height', '1');
+			layer.appendChild (svg);
+
+			// Mark every special tile, so the player sees where the good spots are.
+			var tiles = options.tiles || [];
+			for (var i = 0; i < tiles.length; i ++)
+			{
+				var t = tiles[i];
+				p.oTiles[t[0] + ',' + t[1]] = t;
+
+				var marker = document.createElementNS (p.SVG, 'polygon');
+				marker.setAttribute ('class', 'tile');
+				marker.setAttribute ('points', p.getDiamond (t[0], t[1], t[0] + 1, t[1] + 1));
+				svg.appendChild (marker);
+			}
+
+			p.oArea = document.createElementNS (p.SVG, 'polygon');
+			p.oArea.setAttribute ('class', 'area');
+			p.oArea.style.display = 'none';
+			svg.appendChild (p.oArea);
+
+			p.oLabel = document.createElement ('div');
+			p.oLabel.className = 'label';
+			p.oLabel.style.display = 'none';
+			layer.appendChild (p.oLabel);
+
+			p.oLayer = layer;
+			Game.map.oScrollMap.div.appendChild (layer);
+		},
+
+		// x, y: the map point that a click would choose.
+		'update' : function (x, y)
+		{
+			var p = Game.map.placementPreview;
+			if (p.oLayer == null)
+			{
+				return;
+			}
+
+			// Regions drawn after start () are appended after the layer; stay on top of them.
+			var parent = p.oLayer.parentNode;
+			if (parent && parent.lastChild !== p.oLayer)
+			{
+				parent.appendChild (p.oLayer);
+			}
+
+			var cors = Game.map.getIsometricCors (x, y);
+			var fx = Math.floor (cors[0]);
+			var fy = Math.floor (cors[1]);
+
+			var key = fx + ',' + fy;
+			if (key == p.sLast)
+			{
+				return;
+			}
+			p.sLast = key;
+
+			var r = parseInt (p.oOptions.area, 10) || 0;
+
+			// Sum the special tiles in the area, and count them per name.
+			var sum = 0;
+			var names = [];
+			var counts = {};
+			for (var i = -r; i <= r; i ++)
+			{
+				for (var j = -r; j <= r; j ++)
+				{
+					var t = p.oTiles[(fx + i) + ',' + (fy + j)];
+					if (typeof (t) != 'undefined')
+					{
+						sum += parseFloat (t[2]);
+
+						if (typeof (counts[t[3]]) == 'undefined')
+						{
+							counts[t[3]] = 0;
+							names.push (t[3]);
+						}
+						counts[t[3]] ++;
+					}
+				}
+			}
+
+			p.oArea.setAttribute ('points', p.getDiamond (fx - r, fy - r, fx + r + 1, fy + r + 1));
+			p.oArea.setAttribute ('class', sum > 0 ? 'area bonus' : 'area');
+			p.oArea.style.display = '';
+
+			// Label above the top corner of the area.
+			var top = p.getPoint (fx - r, fy + r + 1);
+			p.oLabel.innerHTML = '';
+
+			var title = document.createElement ('strong');
+			title.appendChild (document.createTextNode (sum > 0
+				? String (p.oOptions.text || '+@@value').replace ('@@value', Math.round (sum))
+				: (p.oOptions.none || '')));
+			p.oLabel.appendChild (title);
+
+			for (var n = 0; n < names.length; n ++)
+			{
+				p.oLabel.appendChild (document.createElement ('br'));
+				p.oLabel.appendChild (document.createTextNode (names[n] + (counts[names[n]] > 1 ? ' (' + counts[names[n]] + ')' : '')));
+			}
+
+			// Keep the label readable whatever the map scale.
+			var scale = Game.map.oScrollMap.scale || 1;
+			p.oLabel.style.transform = 'translate(-50%, -100%) scale(' + (1 / scale) + ')';
+			p.oLabel.style.transformOrigin = '50% 100%';
+			p.oLabel.style.left = top[0] + 'px';
+			p.oLabel.style.top = (top[1] - 8 / scale) + 'px';
+			p.oLabel.style.display = '';
+		},
+
+		'stop' : function ()
+		{
+			var p = Game.map.placementPreview;
+
+			if (p.oLayer != null && p.oLayer.parentNode)
+			{
+				p.oLayer.parentNode.removeChild (p.oLayer);
+			}
+
+			p.oLayer = null;
+			p.oArea = null;
+			p.oLabel = null;
+			p.oOptions = null;
+			p.oTiles = null;
+			p.sLast = null;
 		}
 	},
 	

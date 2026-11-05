@@ -108,7 +108,8 @@ function isoJumpMiniMap ()
 	alert ('isoJumpMiniMap shouldn\'t be used anymore!');
 }
 
-function selectBuildLocation (element, iBuilding, sRuneClassname, sImage, extraData, sErrorMessage)
+// oPreview (optional): what each spot is worth, shown while choosing (see Game.map.placementPreview).
+function selectBuildLocation (element, iBuilding, sRuneClassname, sImage, extraData, sErrorMessage, oPreview)
 {
 	// Fetch the correct window
 	var window = Game.gui.getWindowFromElement (element);
@@ -151,7 +152,8 @@ function selectBuildLocation (element, iBuilding, sRuneClassname, sImage, extraD
 			Game.gui.doDialogRequest (null, null, true);
 		},
 		Game.gui.showAllWindows,
-		sImage
+		sImage,
+		oPreview
 	);
 }
 

@@ -52,6 +52,11 @@ function TiledImageViewer(
     // True while a touch flow selection is open (it never disables the map controls).
     this.selectingTouch = false;
 
+    // Optional hook: onSelectMove(x, y) is called with the map point that a click would
+    // choose, whenever it changes while a location is being chosen (mouse moves, or the
+    // map moves under the touch flow's fixed pointer). Cleared when the selection ends.
+    this.onSelectMove = null;
+
     this.div = document.createElement('div');
 
     this.el.appendChild(this.div);
@@ -163,6 +168,8 @@ TiledImageViewer.prototype.setScale = function (s, deferTiles) {
     if (typeof(this.onscroll) != 'undefined') {
         this.onscroll(-nX / s, -nY / s, 0, 0);
     }
+
+    this.notifySelectCenter();
 }
 
 var TIV_PINCH_TILE_MS = 250;
@@ -376,6 +383,8 @@ TiledImageViewer.prototype.scrollBy = function (x, y) {
     if (typeof(this.onscroll) != 'undefined') {
         this.onscroll(-nX / this.scale, -nY / this.scale, x, y);
     }
+
+    this.notifySelectCenter();
 }
 
 TiledImageViewer.prototype.jumpTo = function (x, y, center) {
@@ -404,6 +413,8 @@ TiledImageViewer.prototype.jumpTo = function (x, y, center) {
     if (typeof(this.onscroll) != 'undefined') {
         this.onscroll(-nX / this.scale, -nY / this.scale, (nX - oX), (nY - oY));
     }
+
+    this.notifySelectCenter();
 }
 
 TiledImageViewer.prototype.updatePointerBackgroundImage = function (image) {
@@ -557,6 +568,31 @@ TiledImageViewer.prototype.selectLocationTouch = function (callback, onFinish, i
     actions.appendChild(cancel);
     actions.appendChild(place);
     this.el.appendChild(actions);
+
+    this.notifySelectCenter();
+};
+
+// Tell the onSelectMove hook which map point a click at screen point (x, y) would choose
+// (the same calculation as selectLocationClick).
+TiledImageViewer.prototype.notifySelectMove = function (x, y) {
+    if (!this.selecting || typeof(this.onSelectMove) != 'function') {
+        return;
+    }
+
+    this.onSelectMove(
+        (x - parseInt(this.div.style.left)) / this.scale,
+        (y - parseInt(this.div.style.top)) / this.scale
+    );
+};
+
+// Touch flow: the point under the fixed pointer changes whenever the map moves or scales.
+TiledImageViewer.prototype.notifySelectCenter = function () {
+    if (!this.selectingTouch) {
+        return;
+    }
+
+    var rect = this.el.getBoundingClientRect();
+    this.notifySelectMove(rect.left + rect.width / 2, rect.top + rect.height / 2);
 };
 
 // Mark the pointer as being placed (class "selecting", styled in map.css) or not.
@@ -667,6 +703,7 @@ TiledImageViewer.prototype.cancelLocationClick = function (x, y) {
     this.onFinish = '';
     this.selLocAct = '';
     this.selLocWin = '';
+    this.onSelectMove = null;
 
     this.setPointerSelecting(false);
 
@@ -772,6 +809,10 @@ function TIV_redrawLocationPoint(e) {
 
         pointer.style.left = (mpos.x - (parseInt(pointer.style.width) / 2)) + 'px';
         pointer.style.top = (mpos.y - (parseInt(pointer.style.height) / 2)) + 'px';
+    }
+
+    if (this._TIV_obj) {
+        this._TIV_obj.notifySelectMove(TIV_getMousePos(e).x, TIV_getMousePos(e).y);
     }
 }
 
