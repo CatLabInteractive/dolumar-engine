@@ -268,6 +268,40 @@ class Neuron_Core_Tools
 	}
 
 	/**
+	 * How long a request waits for the memcached session lock, as ini settings.
+	 *
+	 * The extension's defaults give up after five tries of 150 ms (0.75 s).
+	 * A page refresh fires many requests for the same session while the old
+	 * page's requests are still running, so the lock was often busy for
+	 * longer than that. session_start() then failed, $_SESSION was empty and
+	 * the player got the login prompt. These values retry with a backoff from
+	 * 25 ms to 250 ms, for about 15 seconds in total (the browser gives an
+	 * AJAX request 45 seconds).
+	 */
+	public static function getSessionLockSettings ()
+	{
+		return array (
+			'memcached.sess_lock_wait_min' => '25',
+			'memcached.sess_lock_wait_max' => '250',
+			'memcached.sess_lock_retries' => '64'
+		);
+	}
+
+	/**
+	 * Body of the 503 response sent when the session could not be started
+	 * (lock still busy, or memcached unreachable). Treating that request as
+	 * logged out would show the login prompt to a logged in player, so the
+	 * request stops instead. A page load retries itself; an AJAX request
+	 * shows the connection error until the next one succeeds.
+	 */
+	public static function getSessionUnavailablePage ()
+	{
+		return '<!DOCTYPE html><html><head><meta charset="utf-8">'
+			. '<meta http-equiv="refresh" content="2"><title>Dolumar</title></head>'
+			. '<body><p>The server is busy. Trying again...</p></body></html>';
+	}
+
+	/**
 	 * Session options shared by every session_start() call.
 	 */
 	public static function getSessionOptions (array $options = array (), ?array $server = null)

@@ -195,9 +195,26 @@ elseif (Neuron_Core_Tools::isReadOnlySessionRequest ($_GET['module'] ?? null))
 }
 else
 {
-	session_start (Neuron_Core_Tools::getSessionOptions (array (
+	foreach (Neuron_Core_Tools::getSessionLockSettings () as $setting => $value)
+	{
+		ini_set ($setting, $value);
+	}
+
+	if (!session_start (Neuron_Core_Tools::getSessionOptions (array (
 		'use_cookies' => 0
-	)));
+	))))
+	{
+		// Without its session this request would run as a logged out visitor.
+		if (!headers_sent ())
+		{
+			http_response_code (503);
+			header ('Retry-After: 2');
+			header ('Cache-Control: no-store');
+		}
+
+		echo Neuron_Core_Tools::getSessionUnavailablePage ();
+		exit;
+	}
 }
 
 // Get right language tag (only plain two-letter tags; anything else is ignored)
