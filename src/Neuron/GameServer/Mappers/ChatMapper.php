@@ -170,6 +170,29 @@ class Neuron_GameServer_Mappers_ChatMapper
 		return $this->getDataFromReader ($message);
 	}
 
+	/**
+	* Is there at least one message in this channel older than $messageId?
+	* Used to decide whether "load older messages" makes sense.
+	*/
+	public function hasMessagesBefore ($channelId, $messageId)
+	{
+		$db = Neuron_DB_Database::getInstance ();
+
+		$sql = "
+			SELECT
+				c_m_id
+			FROM
+				n_chat_messages
+			WHERE
+				c_c_id = '" . intval ($channelId) . "' AND
+				c_m_id < '" . intval ($messageId) . "'
+			LIMIT
+				1
+		";
+
+		return count ($db->query ($sql)) > 0;
+	}
+
 	public function getLastReceivedMessageId ()
 	{
 		return $this->lastReceivedMessageId;

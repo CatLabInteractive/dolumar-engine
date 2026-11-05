@@ -50,4 +50,24 @@ class ChatMapperTest extends TestCase
 		$messages = Neuron_GameServer_Mappers_ChatMapper::getInstance()->getMessages(1, 10, "3' OR '1'='1");
 		$this->assertSame([4, 5], $this->ids($messages));
 	}
+
+	public function testHasMessagesBefore(): void
+	{
+		$mapper = Neuron_GameServer_Mappers_ChatMapper::getInstance();
+		$this->assertTrue($mapper->hasMessagesBefore(1, 2));
+		$this->assertTrue($mapper->hasMessagesBefore(1, 5));
+	}
+
+	public function testNoMessagesBeforeTheFirst(): void
+	{
+		$mapper = Neuron_GameServer_Mappers_ChatMapper::getInstance();
+		$this->assertFalse($mapper->hasMessagesBefore(1, 1));
+	}
+
+	public function testHasMessagesBeforeIsPerChannel(): void
+	{
+		Neuron_DB_Database::getInstance()->query("INSERT INTO n_chat_messages SET c_c_id = 2, c_plid = 1, c_date = NOW(), c_message = 'other'");
+		$mapper = Neuron_GameServer_Mappers_ChatMapper::getInstance();
+		$this->assertFalse($mapper->hasMessagesBefore(2, 6));
+	}
 }

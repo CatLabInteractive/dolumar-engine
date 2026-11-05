@@ -133,6 +133,16 @@ abstract class Neuron_GameServer_Windows_BaseChat
 	{
 		if (count ($messages) > 0)
 		{
+			// Only offer older messages when there are any left to load
+			if ($showOlderLink)
+			{
+				$showOlderLink = $this->getMapper ()->hasMessagesBefore
+				(
+					$this->getChannelID (),
+					$messages[0]->getId ()
+				);
+			}
+
 			$page = new Neuron_Core_Template ();
 			$page->set ('messages', $messages);
 			$page->set ('showOlderMessages', $showOlderLink);
