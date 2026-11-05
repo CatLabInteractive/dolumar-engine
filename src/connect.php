@@ -179,9 +179,9 @@ foreach (array (
 	}
 }
 
-if (PHP_SAPI === 'cli')
+if (PHP_SAPI === 'cli' || Neuron_Core_Tools::isSessionlessRequest ($_GET['module'] ?? null))
 {
-	// Same as a fresh session, without touching memcached.
+	// Cron jobs and static asset requests: same as a fresh session, without touching memcached.
 	$_SESSION = array ();
 }
 elseif (Neuron_Core_Tools::isReadOnlySessionRequest ($_GET['module'] ?? null))

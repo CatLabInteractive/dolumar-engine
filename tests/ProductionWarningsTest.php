@@ -68,4 +68,24 @@ class ProductionWarningsTest extends TestCase
 			[['image'], false],
 		];
 	}
+
+	#[DataProvider('sessionlessModules')]
+	public function testSessionlessRequest(mixed $module, bool $expected): void
+	{
+		$this->assertSame($expected, Neuron_Core_Tools::isSessionlessRequest($module));
+	}
+
+	public static function sessionlessModules(): array
+	{
+		return [
+			['gameserver/assets/css/main.css', true],
+			['/gameserver/assets/javascript/gui.js', true],
+			['dialog/', false],
+			['image/minimap/', false],
+			['gameservers/', false],
+			['', false],
+			[null, false],
+			[['gameserver'], false],
+		];
+	}
 }
