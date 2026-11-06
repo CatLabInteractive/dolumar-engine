@@ -261,3 +261,65 @@ body.layout-mobile div.mapobjects div.mapobject-label a.mapobject-label-close
 		filter: drop-shadow(0 0 6px rgba(255, 215, 0, 1));
 	}
 }
+
+/* Placement preview (Game.map.placementPreview): special tiles, the area that counts
+   for the tile under the pointer, and what that area is worth. Lives inside the map
+   layer, so it moves and scales with the map. */
+.map-placement-preview
+{
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 0;
+	height: 0;
+	/* No z-index of its own: the map shares the page's stacking context with the menus and
+	   the minimap, which have none either, so a z-index would draw the preview over them.
+	   placementPreview.update keeps the layer the last child, above the map regions. */
+	z-index: auto;
+	pointer-events: none;
+}
+
+.map-placement-preview svg
+{
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: visible;
+}
+
+.map-placement-preview polygon.tile
+{
+	fill: rgba(255, 230, 120, 0.35);
+	stroke: rgba(255, 230, 120, 0.9);
+	stroke-width: 2;
+}
+
+.map-placement-preview polygon.area
+{
+	fill: rgba(255, 255, 255, 0.12);
+	stroke: rgba(255, 255, 255, 0.9);
+	stroke-width: 3;
+	stroke-dasharray: 10 6;
+}
+
+.map-placement-preview polygon.area.bonus
+{
+	fill: rgba(255, 230, 120, 0.2);
+	stroke: #ffe678;
+}
+
+.map-placement-preview .label
+{
+	position: absolute;
+	padding: 4px 8px;
+	border: 1px solid #8a7550;
+	border-radius: 3px;
+	background: #f3e7c4;
+	box-shadow: 0 1px 0 rgba(64, 51, 31, 0.2);
+	color: #40331f;
+	font-family: Verdana, sans-serif;
+	font-size: 12px;
+	line-height: 1.4;
+	text-align: center;
+	white-space: nowrap;
+}
