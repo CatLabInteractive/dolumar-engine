@@ -128,6 +128,13 @@ elseif ($request == 'reset')
 	}
 }
 
+elseif ($request == 'store')
+{
+	// In-app purchases: api/store/ticket, api/store/packs, api/store/register.
+	Neuron_GameServer_Credits_StoreEndpoint::dispatch (isset ($sInputs[2]) ? strtolower ($sInputs[2]) : null);
+	exit;
+}
+
 elseif ($request == 'creditstart' || $request == 'creditnotify')
 {
 	$client = Neuron_GameServer_Credits_AccountsClient::fromConfig ();

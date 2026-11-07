@@ -150,4 +150,50 @@ class AccountsClientTest extends TestCase
 		$client = new Neuron_GameServer_Credits_AccountsClient ('https://accounts.catlab.eu/', 'cid', 'secret');
 		$this->assertSame ('https://accounts.catlab.eu/credits/' . CATLAB_CREDITS_TYPE_ID . '/purchase', $client->getBuyUrl ());
 	}
+
+	public function testStorePacksUseClientCredentials (): void
+	{
+		$client = $this->client ([new Response (200, [], json_encode (['packs' => [['sku' => 'credits.100', 'credits' => '100'], ['bad' => 1], ['sku' => 'credits.500', 'credits' => 500]]]))]);
+		$this->assertSame ([['sku' => 'credits.100', 'credits' => 100], ['sku' => 'credits.500', 'credits' => 500]], $client->getStorePacks ());
+		$request = $this->history[0]['request'];
+		$this->assertSame ('GET', $request->getMethod ());
+		$this->assertSame ('/api/1.0/credits/store/packs', $request->getUri ()->getPath ());
+		$this->assertSame ('Basic ' . base64_encode ('cid:secret'), $request->getHeaderLine ('Authorization'));
+	}
+
+	public function testStorePacksFailuresThrow (): void
+	{
+		$client = $this->client ([new Response (503, [], '{"error":"unavailable"}')]);
+		$this->expectException (Neuron_GameServer_Credits_AccountsUnavailable::class);
+		$client->getStorePacks ();
+	}
+
+	public function testRegisterStorePurchasePostsTheProofAndReturnsTheAnswerAsIs (): void
+	{
+		$client = $this->client ([
+			new Response (200, [], json_encode (['status' => 'registered', 'credits' => 500, 'transaction_id' => 9, 'balance' => 500])),
+			new Response (403, [], json_encode (['error' => 'rejected', 'reason' => 'invalid_purchase'])),
+			new Response (503, [], 'not json'),
+		]);
+		$purchase = ['source' => 'google', 'sku' => 'credits.500', 'store_reference' => 'tok', 'proof' => ['purchaseToken' => 'tok', 'productId' => 'credits.500']];
+
+		$result = $client->registerStorePurchase (42, $purchase);
+		$this->assertSame (200, $result['status']);
+		$this->assertSame ('registered', $result['body']['status']);
+		$request = $this->history[0]['request'];
+		$this->assertSame ('POST', $request->getMethod ());
+		$this->assertSame ('/api/1.0/profiles/42/credits/store', $request->getUri ()->getPath ());
+		$this->assertSame ('Basic ' . base64_encode ('cid:secret'), $request->getHeaderLine ('Authorization'));
+		$this->assertSame ($purchase, json_decode ((string)$request->getBody (), true));
+
+		$this->assertSame (['status' => 403, 'body' => ['error' => 'rejected', 'reason' => 'invalid_purchase']], $client->registerStorePurchase (42, $purchase));
+		$this->assertSame (['status' => 503, 'body' => []], $client->registerStorePurchase (42, $purchase));
+	}
+
+	public function testRegisterStorePurchaseNetworkFailureIsUnavailable (): void
+	{
+		$client = $this->client ([new \GuzzleHttp\Exception\ConnectException ('timed out', new \GuzzleHttp\Psr7\Request ('POST', 'https://accounts.example/'))]);
+		$this->expectException (Neuron_GameServer_Credits_AccountsUnavailable::class);
+		$client->registerStorePurchase (42, ['source' => 'google']);
+	}
 }

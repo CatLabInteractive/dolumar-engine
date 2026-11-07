@@ -110,6 +110,7 @@
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/functions.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/forum.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/push.js?version=<?=$application_version?>"></script>
+		<script type="text/javascript" src="<?=$static_client_url?>javascript/store.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/konami.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/fancybox.js?version=<?=$application_version?>"></script>
 		<script type="text/javascript" src="<?=$static_client_url?>javascript/modernizr/modernizr-1.5.min.js?version=<?=$application_version?>"></script>
