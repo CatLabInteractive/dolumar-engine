@@ -177,6 +177,54 @@ class Neuron_GameServer_Credits_AccountsClient
 		return 'refunded';
 	}
 
+	/**
+	 * The credit packs the app can sell in its store, as Accounts knows them
+	 * for this product: [{sku: "credits.500", credits: 500}, ...].
+	 *
+	 * @throws Neuron_GameServer_Credits_AccountsUnavailable network failure or 5xx
+	 * @throws Neuron_GameServer_Credits_AccountsRejected 4xx (bad client credentials, no credit type)
+	 */
+	public function getStorePacks (): array
+	{
+		$data = $this->send ('GET', 'api/1.0/credits/store/packs', $this->basic (), true);
+		$packs = [];
+		foreach (($data['packs'] ?? []) as $pack)
+		{
+			if (is_array ($pack) && isset ($pack['sku'], $pack['credits']) && is_string ($pack['sku']))
+			{
+				$packs[] = ['sku' => $pack['sku'], 'credits' => (int) $pack['credits']];
+			}
+		}
+		return $packs;
+	}
+
+	/**
+	 * Register a credit pack bought in Google Play or the App Store to a
+	 * profile. Accounts verifies the purchase with the store and credits the
+	 * profile once per store reference; its answer (200 registered/duplicate,
+	 * 400, 403 rejected, 404, 503 unavailable) is passed back as is, so the
+	 * app can tell the player what happened.
+	 *
+	 * @param array $purchase source, sku, store_reference, proof
+	 * @return array{status:int, body:array}
+	 * @throws Neuron_GameServer_Credits_AccountsUnavailable network failure
+	 */
+	public function registerStorePurchase (int $profileId, array $purchase): array
+	{
+		$options = $this->basic () + ['json' => $purchase, 'http_errors' => false];
+		try
+		{
+			$response = $this->http->request ('POST', $this->baseUrl . 'api/1.0/profiles/' . $profileId . '/credits/store', $options);
+		}
+		catch (GuzzleException $e)
+		{
+			throw new Neuron_GameServer_Credits_AccountsUnavailable ('Accounts is unreachable.');
+		}
+
+		$body = json_decode ((string) $response->getBody (), true);
+		return ['status' => $response->getStatusCode (), 'body' => is_array ($body) ? $body : []];
+	}
+
 	private function bearer (string $accessToken): array
 	{
 		return ['headers' => ['Authorization' => 'Bearer ' . $accessToken, 'Accept' => 'application/json']];

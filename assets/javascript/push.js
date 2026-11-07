@@ -22,6 +22,13 @@ Game.push = {
 		);
 	},
 
+	// The Dolumar app (mobile/ in the game repository) appends DolumarApp/<version>
+	// to the user agent. Its WebView has no Web Push; the app will get native push.
+	'inApp' : function ()
+	{
+		return /DolumarApp\//.test (navigator.userAgent);
+	},
+
 	// iOS only offers push to a site that was added to the home screen.
 	'needsHomeScreen' : function ()
 	{
@@ -239,6 +246,18 @@ Game.push = {
 			enable.style.display = canEnable ? '' : 'none';
 			disable.style.display = canDisable ? '' : 'none';
 		};
+
+		// Nothing the player can do about push inside the app: hide the section and its heading.
+		if (Game.push.inApp ())
+		{
+			container.style.display = 'none';
+			var heading = container.previousElementSibling;
+			if (heading && heading.tagName === 'H2')
+			{
+				heading.style.display = 'none';
+			}
+			return;
+		}
 
 		if (Game.push.needsHomeScreen ())
 		{

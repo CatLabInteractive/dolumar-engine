@@ -89,6 +89,27 @@ as gone (404/410).
 - Categories: the game lists what players can mute with `getPushCategories()` (section => label) and what starts
   muted with `getPushDefaultMuted()`; the choice is stored in the `pushMuted` preference.
 
+## In-app purchases (the Android/iOS app)
+
+The game's credits live on CatLab Accounts (`Neuron_GameServer_Credits_*`). In the app (`Neuron_GameServer_App`:
+the WebView appends `DolumarApp/<version> (<platform>)` to the user agent) credits must be bought through Google
+Play or the App Store, never through the web shop. The game page cannot reach the store plugin, so:
+
+- `POST api/store/ticket` (game page, same origin, logged in) answers a signed, 15-minute ticket for the player
+  (`Neuron_GameServer_Credits_StoreTicket`, HMAC with a key derived from `OPENID_CONNECT_SECRET`) and the url of
+  the app's bundled store page (`https://localhost/store.html` on Android, `app://localhost/store.html` on iOS)
+  with the ticket and the api url. `Game.store.open()` (`assets/javascript/store.js`) does this; the game shows it
+  instead of the web shop link when `Neuron_GameServer_App::isApp()`.
+- `GET api/store/packs` and `POST api/store/register` are called by that store page, cross-origin: CORS is
+  answered only for the two app origins (`Neuron_GameServer_App::getOrigins()`), no cookies are involved. `packs`
+  lists the product's `credits.<n>` skus from Accounts. `register` reads the ticket, looks up the player's Accounts
+  profile (`CatLabAuthMapper`) and forwards `{source, sku, store_reference, proof}` with the game's client
+  credentials to Accounts' `profiles/{id}/credits/store`, which verifies the receipt with the store and credits the
+  profile once per store reference. Accounts' answer (200 registered/duplicate with the balance, 403 rejected,
+  503 unavailable with a reason) is passed back so the store page finishes the store transaction only after a 200.
+- All of it is in `Neuron_GameServer_Credits_StoreEndpoint`, free of header()/echo and tested with a fake client
+  (`tests/Credits/StoreEndpointTest.php`). Without credits configured the routes answer 404.
+
 ## Configuration
 
 The engine reads configuration from PHP constants that the game's bootstrap defines from environment variables
